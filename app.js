@@ -182,10 +182,16 @@ function vocab(e){
 const couleurNote = n => (ECHELLE.find(x => x[0] === n) || [])[3] || '#eee';
 function ressentiHTML(cle, r, avecSens){
   r = r || {};
+  const motChoisi = r.mot ? `<span class="chip-sel">· ${esc(r.mot)}</span>` : '';
+  const sensChoisi = (avecSens && r.sens) ? `<span class="chip-sel">· ${esc(SENSATIONS.find(([k])=>k===r.sens)?.[1]||r.sens)}</span>` : '';
+  const ouvert = !r.mot; // ouvert par défaut si pas encore de mot
   return `<div class="notes" role="group" aria-label="Note de 1 à 10">${ECHELLE.map(([n, t]) => `<button type="button" title="${esc(t)}" style="background:${couleurNote(n)}" class="${r.note === n ? 'ici' : ''}" data-note="${n}" data-cle="${cle}">${n}</button>`).join('')}</div>
    ${r.note ? `<p class="small muted">${r.note} : ${esc(ECHELLE[r.note - 1][1])} · ${esc(ECHELLE[r.note - 1][2])}</p>` : ''}
-   <div class="chips">${vocab(EL()).map(m => `<button type="button" class="${r.mot === m ? 'ici' : ''}" data-mot="${esc(m)}" data-cle="${cle}">${esc(m)}</button>`).join('')}<button type="button" data-autremot data-cle="${cle}">✏️ autre mot</button></div>
-   ${avecSens ? `<div class="chips">${SENSATIONS.map(([k, t]) => `<button type="button" class="${r.sens === k ? 'ici' : ''}${k === 'douleur' ? ' stop' : ''}" data-sens="${k}" data-cle="${cle}">${esc(t)}</button>`).join('')}</div>` : ''}`;
+   <details class="volet-mots"${ouvert ? ' open' : ''}>
+     <summary>Choisir un mot ${motChoisi}${sensChoisi}</summary>
+     <div class="chips">${vocab(EL()).map(m => `<button type="button" class="${r.mot === m ? 'ici' : ''}" data-mot="${esc(m)}" data-cle="${cle}">${esc(m)}</button>`).join('')}<button type="button" data-autremot data-cle="${cle}">✏️ autre mot</button></div>
+     ${avecSens ? `<div class="chips">${SENSATIONS.map(([k, t]) => `<button type="button" class="${r.sens === k ? 'ici' : ''}${k === 'douleur' ? ' stop' : ''}" data-sens="${k}" data-cle="${cle}">${esc(t)}</button>`).join('')}</div>` : ''}
+   </details>`;
 }
 /* cle = "chemin" dans la séance de l'élève : ex. "ech.debut" ou "exos.rowh.ressenti" ou "test.dc.premiere" */
 function objetCle(cle, creer){

@@ -93,7 +93,13 @@ input.code{font:800 34px/1 var(--d);letter-spacing:.4em;text-align:center}
 .retour.non{background:var(--attention-pale);color:#7c2d12}
 .retour.stop{background:var(--alerte-pale);color:#7f1d1d}
 details{margin:6px 0}
-summary{cursor:pointer;font-weight:700;min-height:44px;display:flex;align-items:center}
+summary{cursor:pointer;font-weight:700;min-height:44px;display:flex;align-items:center;gap:6px}
+.volet-mots>summary{font-weight:600;font-size:15px;color:var(--repere);list-style:none}
+.volet-mots>summary::-webkit-details-marker{display:none}
+.volet-mots>summary::before{content:'▶';font-size:11px;transition:transform .2s;display:inline-block}
+.volet-mots[open]>summary::before{transform:rotate(90deg)}
+.volet-mots>summary .chip-sel{background:var(--encre);color:#fff;border-radius:14px;padding:2px 10px;font-size:14px;font-weight:700}
+.volet-mots .chips{margin-top:4px}
 /* Test 10 RM */
 .ecran{position:fixed;inset:0;z-index:40;background:var(--sol);overflow:auto;padding:12px 16px calc(24px + env(safe-area-inset-bottom))}
 .compteur{font:800 120px/1 var(--d);text-align:center;margin:8px 0}
