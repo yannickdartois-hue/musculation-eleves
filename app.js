@@ -192,6 +192,18 @@ function carteEchauffement(s1){
    <h4>${s1 ? 'Après 2-3 min de course' : 'Début d\'échauffement'} : note et mot</h4>${ressentiHTML('ech.debut', ech.debut)}
    <h4>Fin d'échauffement : note et mot</h4>${ressentiHTML('ech.fin', ech.fin)}</section>`;
 }
+function vignette(id){
+  const im = imgAtelier(id), a = atelier(id);
+  return im ? `<button type="button" class="vign-bt" data-fiche="${id}" aria-label="Fiche : ${esc(a.nom)}"><img class="vign" src="${im}" alt="" loading="lazy"></button>`
+            : `<button type="button" class="bt mini fiche-bt" data-fiche="${id}">📄 Fiche</button>`;
+}
+function ouvrirFiche(id){
+  const a = atelier(id), im = imgAtelier(id);
+  fenetre(`<div class="rangee" style="justify-content:space-between"><h3>${a.n ? a.n + '. ' : ''}${esc(a.nom)}</h3><button type="button" class="bt mini" data-act="fermerFen">Fermer</button></div>${im ? `<img class="illu" src="${im}" alt="${esc(a.nom)}">` : ''}
+   <p class="small muted">${esc(a.muscles)} · ${esc(SUPPORTS[a.support].nom)}</p><h4>Placement</h4><ul class="ats">${a.crit.map(c => `<li>${esc(c)}</li>`).join('')}</ul><h4>Respiration</h4><p>${esc(a.resp)}</p><h4>Sécurité</h4><p>${esc(a.secu)}</p>
+   ${a.niveaux ? `<h4>Niveaux</h4><ol class="ats">${a.niveaux.map(n => `<li>${esc(n)}</li>`).join('')}</ol>` : ''}${a.moins ? `<p class="small"><b>− Plus facile.</b> ${esc(a.moins)}</p>` : ''}${a.plus ? `<p class="small"><b>+ Plus difficile.</b> ${esc(a.plus)}</p>` : ''}
+   <button type="button" class="bt pleine" data-act="fermerFen" style="margin-top:10px">Fermer</button>`);
+}
 function ficheAtelier(a){
   const im = imgAtelier(a.id);
   return `<details><summary>Fiche : placement, respiration, sécurité</summary>${im ? `<img class="illu" src="${im}" alt="${esc(a.nom)}" loading="lazy">` : ''}<p class="small muted">${esc(a.muscles)} · ${esc(SUPPORTS[a.support].nom)}</p><ul class="ats small">${a.crit.map(c => `<li>${esc(c)}</li>`).join('')}</ul><p class="small"><b>Respiration.</b> ${esc(a.resp)}</p><p class="small"><b>Sécurité.</b> ${esc(a.secu)}</p>${a.moins ? `<p class="small"><b>− Plus facile.</b> ${esc(a.moins)}</p>` : ''}${a.plus ? `<p class="small"><b>+ Plus difficile.</b> ${esc(a.plus)}</p>` : ''}</details>`;
@@ -200,7 +212,7 @@ function carteCircuit(){
   const s = sea(EL(), 'S1'), c = s.circuit || {};
   const fait = CIRCUIT_S1.filter(id => c[id]).length;
   return `<section class="carte"><h3>Circuit · 12 ateliers</h3><p class="small">5 min par atelier : 2 × 10 répétitions chacun, charge légère. On apprend le geste. <b>${fait}/12</b> faits.</p>
-   ${CIRCUIT_S1.map((id, i) => {const a = atelier(id);const im = imgAtelier(id);return `<div class="ex${c[id] ? ' fait' : ''}"><header>${im ? `<img class="vign" src="${im}" alt="" loading="lazy">` : ''}<b style="flex:1">${a.n}. ${esc(a.nom)}</b><button type="button" class="bt mini${c[id] ? ' ok' : ''}" data-circuit="${id}">${c[id] ? '✓ Fait' : 'Fait'}</button></header>${ficheAtelier(a)}</div>`}).join('')}</section>`;
+   ${CIRCUIT_S1.map((id, i) => {const a = atelier(id);return `<div class="ex${c[id] ? ' fait' : ''}"><header>${vignette(id)}<b style="flex:1">${a.n}. ${esc(a.nom)}</b><button type="button" class="bt mini${c[id] ? ' ok' : ''}" data-circuit="${id}">${c[id] ? '✓ Fait' : 'Fait'}</button></header></div>`}).join('')}</section>`;
 }
 const QUESTIONS = [
  {k:'freq', q:"Combien de fois par semaine fais-tu une activité physique (club, AS, salle, vélo, marche…) ?", o:['0','1','2','3','4','5 ou plus']},
@@ -232,8 +244,8 @@ function carteSitue(){
 function carteTest(){
   const e = EL();
   return `<section class="carte"><h3>Test 10 RM · ${esc(prenom(e.nom))}</h3><p class="small">La charge la plus lourde soulevée 10 fois sans No REP, en montant progressivement. Le partenaire tient le téléphone et juge.</p>
-   ${ATELIERS_TEST.map(id => {const a = atelier(id), r = e.rm[id];return `<div class="ex${r ? ' fait' : ''}"><header><b>${esc(a.nom)}</b>${r ? `<span><b>${fmtKg(r.cm)}</b> <span class="small muted">${r.mode === 'direct' ? 'saisie directe' : 'test'}</span></span>` : ''}</header>
-     <div class="rangee"><button type="button" class="bt mini act" data-test="${id}">${r ? 'Refaire le test' : 'Commencer le test'}</button><button type="button" class="bt mini" data-direct="${id}">Saisie directe</button></div>${ficheAtelier(a)}</div>`}).join('')}</section>`;
+   ${ATELIERS_TEST.map(id => {const a = atelier(id), r = e.rm[id];return `<div class="ex${r ? ' fait' : ''}"><header>${vignette(id)}<b style="flex:1">${esc(a.nom)}</b>${r ? `<span><b>${fmtKg(r.cm)}</b> <span class="small muted">${r.mode === 'direct' ? 'saisie directe' : 'test'}</span></span>` : ''}</header>
+     <div class="rangee"><button type="button" class="bt mini act" data-test="${id}">${r ? 'Refaire le test' : 'Commencer le test'}</button><button type="button" class="bt mini" data-direct="${id}">Saisie directe</button></div></div>`}).join('')}</section>`;
 }
 let T = null; // test en cours
 function ouvrirTest(at){
@@ -337,11 +349,9 @@ function carteExo(at){
   const e = EL(), a = atelier(at), p = prevuDe(e, SEANCE, at), ex = (sea(e, SEANCE).exos || {})[at] || {};
   const r = ex.ressenti || {}, coh = ex.coh, aut = autre();
   const etat = ex.real ? (coh && !coh.ok ? ' alerte' : ' fait') : '';
-  const im = imgAtelier(at);
-  let h = `<div class="ex${etat}" id="ex-${at}"><header>${im ? `<img class="vign" src="${im}" alt="" loading="lazy">` : ''}<b style="flex:1">${esc(a.nom)}</b><span class="small muted">${esc(a.groupe)}</span></header>${prevuTexte(a, p)}`;
+  let h = `<div class="ex${etat}" id="ex-${at}"><header>${vignette(at)}<b style="flex:1">${esc(a.nom)}</b><span class="small muted">${esc(a.groupe)}</span></header>${prevuTexte(a, p)}`;
   if(a.type === 'charge' && !(p && p.charge))h += `<p class="small">Pas encore de charge max sur cet atelier : <button type="button" class="lien" data-direct="${at}">saisie directe</button> (une série réussie entre 3 et 10 répétitions).</p>`;
   if(a.type === 'variante' && a.niveaux)h += `<div class="chips">${a.niveaux.map((t, i) => `<button type="button" class="${p && p.niv === i ? 'ici' : ''}" data-niv="${i}" data-at="${at}" title="${esc(t)}">Niv. ${i + 1}</button>`).join('')}</div>`;
-  h += ficheAtelier(a);
   if(!ex.real)h += `<div class="rangee"><button type="button" class="bt ok" data-fait="${at}">✓ Fait comme prévu</button><button type="button" class="bt" data-modif="${at}">Fait autrement</button></div>`;
   else h += `<p class="small">✓ Réalisé : ${ex.real.series} séries × ${ex.real.reps}${a.temps ? ' s' : ' rép.'}${ex.real.charge ? ' à ' + fmtKg(ex.real.charge) : ''}${ex.real.diff ? ' <b>(différent du prévu)</b>' : ''} <button type="button" class="lien" data-modif="${at}">modifier</button></p>
     <h4>Mon ressenti</h4>${ressentiHTML('exos.' + at + '.ressenti', r, true)}
@@ -538,6 +548,7 @@ document.addEventListener('click', async ev => {
   if(d.forme){sea(EL(), SEANCE).forme = +d.forme;sauver();rendre();return}
   if(d.circuit){const s = sea(EL(), 'S1');s.circuit = s.circuit || {};s.circuit[d.circuit] = !s.circuit[d.circuit];sauver();rendre();return}
   if(d.situe){const e = EL();e.situe = e.situe || {};if(d.multi){const l = e.situe[d.situe] = e.situe[d.situe] || [];const i = l.indexOf(d.v);i < 0 ? l.push(d.v) : l.splice(i, 1)}else e.situe[d.situe] = d.v;sauver();rendre();return}
+  if(d.fiche){ouvrirFiche(d.fiche);return}
   if(d.test){ouvrirTest(d.test);return}
   if(d.direct){saisieDirecte(d.direct);return}
   if(d.tcharge){const p = chargesPossibles(atelier(T.at).support), c = +d.tcharge > 0 ? p.find(x => x >= T.charge + T.pas - 1e-9) : [...p].reverse().find(x => x <= T.charge - T.pas + 1e-9);if(c != null)T.charge = c;rendreTest();return}
