@@ -19,6 +19,8 @@ function toast(t){const d = document.createElement('div');d.textContent = t;d.st
 
 /* ---------- État ---------- */
 let CARNETS = lire(CLE, {});
+let CLASSES = lire('mue-classes', {});   // reçues par le QR de la classe : {classe:{l:[noms], u:lien Nuage}}
+let SEL = {classe:'', noms:[]};          // choix en cours pour un nouveau binôme
 let B = null;          // carnet ouvert
 let P = 0;             // élève qui pratique (index dans B.e)
 let ONGLET = 'seance';
@@ -65,24 +67,34 @@ function accueil(){
   const l = Object.values(CARNETS).sort((a, b) => (b.maj || 0) - (a.maj || 0));
   return `<h2>Mon carnet de musculation</h2>
   ${l.length ? `<section class="carte"><h3>Carnets sur ce téléphone</h3>${l.map(c => `<button type="button" class="bt pleine" style="margin:6px 0;justify-content:flex-start" data-ouvrir="${c.id}">🔒 ${esc(c.e.map(x => x.nom).join(' & '))}${c.classe ? ` <span class="muted small">· ${esc(c.classe)}</span>` : ''}</button>`).join('')}</section>` : ''}
-  <section class="carte act"><h3>＋ Nouveau binôme</h3><p class="small muted">Un carnet par binôme, sur le téléphone de l'un des deux. Écris le prénom ET le nom de chacun (comme sur Pronote).</p>
-   <label class="ch" for="nClasse">Classe</label><input type="text" id="nClasse" placeholder="ex. TG3" maxlength="12" autocomplete="off">
-   <label class="ch" for="nE1">Élève 1 : prénom et nom</label><input type="text" id="nE1" placeholder="ex. Léa MARTIN" autocomplete="off" maxlength="60">
-   <label class="ch" for="nE2">Élève 2 : prénom et nom</label><input type="text" id="nE2" placeholder="ex. Hugo BERNARD" autocomplete="off" maxlength="60">
-   <label class="ch" for="nE3">Élève 3, s'il y a un trinôme (facultatif)</label><input type="text" id="nE3" autocomplete="off" maxlength="60">
-   <label class="ch" for="nCode">Code secret du binôme (4 chiffres)</label><input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" id="nCode" class="code" autocomplete="off">
-   <p class="small muted">Il protège votre carnet si le téléphone est prêté. Ne l'oubliez pas : le professeur ne peut pas le retrouver.</p>
-   <button type="button" class="bt act pleine" data-act="creer">Créer le carnet</button></section>
+  <section class="carte"><h3>📷 QR de la classe</h3><p class="small muted">Scanne le QR affiché par le professeur : il donne la liste de la classe${Object.keys(CLASSES).length ? ' (classe' + (Object.keys(CLASSES).length > 1 ? 's' : '') + ' reçue' + (Object.keys(CLASSES).length > 1 ? 's' : '') + ' : ' + esc(Object.keys(CLASSES).join(', ')) + ')' : ''} et ouvre la séance du jour.</p><button type="button" class="bt act" data-act="scanClasse">📷 Scanner le QR de la classe</button></section>
+  <section class="carte act"><h3>＋ Nouveau binôme</h3>${blocNouveau()}</section>
   <section class="carte"><h3>👀 Découvrir l'appli</h3><p class="small muted">Un binôme fictif déjà rempli, pour voir tous les écrans. Rien n'est enregistré.</p><button type="button" class="bt" data-act="demo">Essayer l'appli (démo)</button></section>
   <section class="carte info"><h3>Sans carnet</h3><div class="rangee"><button type="button" class="bt mini" data-act="mobiles">📋 Les 3 mobiles</button><button type="button" class="bt mini" data-act="calcLibre">🧮 Calculette</button></div></section>`;
 }
+function blocNouveau(){
+  const cl = Object.keys(CLASSES).sort();
+  if(cl.length && !CLASSES[SEL.classe])SEL.classe = cl.length === 1 ? cl[0] : '';
+  const pris = new Set(Object.values(CARNETS).filter(c => c.classe === SEL.classe).flatMap(c => c.e.map(x => x.nom)));
+  const choix = cl.length ? `<p class="small">1. Ta classe :</p><div class="chips">${cl.map(c => `<button type="button" class="${c === SEL.classe ? 'ici' : ''}" data-selclasse="${esc(c)}">${esc(c)}</button>`).join('')}</div>
+   ${SEL.classe ? `<p class="small">2. Touchez vos noms (2, ou 3 pour un trinôme) :</p><div class="chips">${CLASSES[SEL.classe].l.map(n => `<button type="button" class="${SEL.noms.includes(n) ? 'ici' : ''}" data-selnom="${esc(n)}"${pris.has(n) ? ' title="déjà dans un carnet sur ce téléphone"' : ''}>${pris.has(n) ? '✓ ' : ''}${esc(n)}</button>`).join('')}</div>
+   ${SEL.noms.length ? `<p><b>${esc(SEL.noms.join(' & '))}</b></p>` : ''}` : ''}` : `<p class="retour non">Scannez d'abord le <b>QR de la classe</b> (ci-dessous) : la liste des élèves s'affichera ici.</p>`;
+  return `${choix}<details${cl.length ? '' : ' open'}><summary>${cl.length ? 'Un nom manque dans la liste ?' : 'Pas de QR ? Écrire les noms'}</summary><p class="small muted">Prénom ET nom, comme sur Pronote.</p>
+   ${cl.length ? '' : `<label class="ch" for="nClasse">Classe</label><input type="text" id="nClasse" placeholder="ex. TG3" maxlength="20" autocomplete="off">`}
+   <label class="ch" for="nE1">Élève (prénom et nom)</label><input type="text" id="nE1" autocomplete="off" maxlength="60"><label class="ch" for="nE2">Élève (prénom et nom)</label><input type="text" id="nE2" autocomplete="off" maxlength="60"></details>
+   <p class="small">${cl.length ? '3' : '2'}. Code secret du binôme (4 chiffres) :</p><input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" id="nCode" class="code" autocomplete="off">
+   <p class="small muted">Il protège votre carnet si le téléphone est prêté. Ne l'oubliez pas : le professeur ne peut pas le retrouver.</p>
+   <button type="button" class="bt act pleine" data-act="creer">Créer le carnet</button>`;
+}
 async function creer(){
-  const classe = $('nClasse').value.trim(), noms = ['nE1', 'nE2', 'nE3'].map(i => $(i).value.trim().replace(/\s+/g, ' ')).filter(Boolean), code = $('nCode').value.trim();
-  if(noms.length < 2)return toast('Écris les deux élèves du binôme.');
+  const classe = SEL.classe || ($('nClasse') ? $('nClasse').value.trim() : ''), code = $('nCode').value.trim();
+  const noms = SEL.noms.concat(['nE1', 'nE2'].map(i => $(i) ? $(i).value.trim().replace(/\s+/g, ' ') : '').filter(Boolean));
+  if(noms.length < 2)return toast('Choisissez les deux élèves du binôme.');
+  if(noms.length > 3)return toast('3 élèves au maximum.');
   if(noms.some(n => n.split(' ').length < 2))return toast('Prénom ET nom pour chaque élève, ex. Léa MARTIN.');
   if(!/^\d{4}$/.test(code))return toast('Le code secret : 4 chiffres.');
   const id = uid();
-  B = {id, v:1, app:'musculation-eleves', classe, cree:jour(), maj:Date.now(), equipe:'', listes:{}, motsClasse:[], envois:[], e:noms.map(nouvelEleve), code:await empreinte(id, code)};
+  B = {id, v:1, app:'musculation-eleves', classe, cree:jour(), maj:Date.now(), equipe:'', listes:{}, motsClasse:[], envois:[], e:noms.map(nouvelEleve), code:await empreinte(id, code)};SEL = {classe:'', noms:[]};
   P = 0;ONGLET = 'seance';SEANCE = 'S1';sauver();ecrire(CLE_DERNIER, id);rendre();window.scrollTo(0, 0);
 }
 function ouvrir(id){
@@ -100,9 +112,39 @@ function seanceEnCours(){ // première séance sans saisie, sinon la dernière
   return 'S9';
 }
 
+/* ================== QR de la classe ================== */
+function b64urlToBytes(t){t = t.replace(/-/g, '+').replace(/_/g, '/');while(t.length % 4)t += '=';const b = atob(t), u = new Uint8Array(b.length);for(let i = 0;i < b.length;i++)u[i] = b.charCodeAt(i);return u}
+async function decoderQR(txt){
+  const m = /^MUS([01]):([A-Za-z0-9_-]+)$/.exec(String(txt || '').trim());if(!m)throw new Error('Ce QR ne vient pas des applis de musculation.');
+  let bytes = b64urlToBytes(m[2]);
+  if(m[1] === '1'){if(typeof DecompressionStream !== 'function')throw new Error('Téléphone trop ancien pour lire ce QR : mets-le à jour.');bytes = new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer())}
+  const o = JSON.parse(new TextDecoder().decode(bytes));if(!o || o.a !== 'MUS')throw new Error('QR non reconnu.');return o;
+}
+async function recevoirClasse(o){
+  if(o.t !== 'C')throw new Error('Ce n\'est pas le QR de la classe.');
+  CLASSES[o.c] = {l:o.l || [], u:o.u || '', ts:o.ts || 0};ecrire('mue-classes', CLASSES);
+  if(window.EPSCode){EPSCode.memoriserCle(o.c, o.cc);if(o.cj)await EPSCode.appliquerJour(o.c, o.cj)}
+  if(!B)SEL.classe = o.c;
+  return 'Classe ' + o.c + ' : ' + (o.l || []).length + ' élèves' + (o.cj && o.cj.d === jour() ? ' · séance ' + o.cj.s + ' ouverte' : '');
+}
+let FLUX = null;
+function scanner(){
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia)return toast('Caméra indisponible sur ce téléphone.');
+  fenetre(`<h3>📷 QR de la classe</h3><video playsinline muted style="width:100%;border-radius:12px;background:#000"></video><p class="small" id="scMsg">Vise le QR affiché par le professeur.</p><button type="button" class="bt pleine" data-act="fermerScan">Fermer</button>`);
+  const v = document.querySelector('.fen video'), c = document.createElement('canvas'), x = c.getContext('2d', {willReadFrequently:true});let fini = false;
+  navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}}).then(st => {FLUX = st;v.srcObject = st;v.play();boucle()}).catch(() => {$('scMsg').textContent = 'Autorise la caméra pour cette page, puis réessaie.'});
+  function boucle(){
+    if(!FLUX || !document.querySelector('.fen video'))return;
+    if(v.readyState >= 2){c.width = v.videoWidth;c.height = v.videoHeight;x.drawImage(v, 0, 0);const r = jsQR(x.getImageData(0, 0, c.width, c.height).data, c.width, c.height);
+      if(r && r.data && !fini){fini = true;decoderQR(r.data).then(recevoirClasse).then(t => {arreterScan();fermerFen();toast('✓ ' + t);rendre()}).catch(e => {$('scMsg').textContent = e.message;setTimeout(() => fini = false, 1500)})}}
+    requestAnimationFrame(boucle);
+  }
+}
+function arreterScan(){if(FLUX)FLUX.getTracks().forEach(t => t.stop());FLUX = null}
+
 /* ================== Fenêtres ================== */
 function fenetre(html){$('couche').innerHTML = `<div class="fen" data-fond><div role="dialog" aria-modal="true">${html}</div></div>`}
-function fermerFen(){$('couche').innerHTML = ''}
+function fermerFen(){arreterScan();$('couche').innerHTML = ''}
 function panneauMobiles(){
   fenetre(`<div class="rangee" style="justify-content:space-between"><h3>Les 3 mobiles</h3><button type="button" class="bt mini" data-act="fermerFen">Fermer</button></div>${MOBILES_ORDRE.map(mobileHTML).join('')}
    <h4>Échelle de ressentis</h4>${echelleHTML()}<h4>Sécurité</h4><ul class="ats small">${SECU.regles.map(r => `<li>${esc(r)}</li>`).join('')}</ul><p class="small"><b>Respiration.</b> ${esc(SECU.respiration)}</p>`);
@@ -164,7 +206,7 @@ function apresRessenti(cle){
 function vueSeance(){
   const s = seanceById(SEANCE), e = EL();
   const puces = `<div class="puces">${SEANCES_IDS.map(S => {const f = e.seances[S] && Object.keys(e.seances[S]).length;return `<button type="button" data-seance="${S}" class="${S === SEANCE ? 'ici' : ''}${f ? ' fait' : ''}">${S}</button>`}).join('')}</div>`;
-  let h = puces + `<h2>${SEANCE} · ${esc(s.titre)}</h2><p class="muted small">${esc(s.obj)}</p>`;
+  let h = puces + `<div class="rangee" style="justify-content:flex-end"><button type="button" class="bt mini" data-act="scanClasse" data-libre>📷 QR de la classe</button></div><h2>${SEANCE} · ${esc(s.titre)}</h2><p class="muted small">${esc(s.obj)}</p>`;
   const n = +SEANCE.slice(1);
   if(n >= 3)h += carteForme();
   if(n <= 2)h += carteEchauffement(n === 1);
@@ -492,7 +534,7 @@ function vueEnvoyer(){
   const der = (B.envois || []).slice(-1)[0];
   return `<h2>Envoyer le carnet</h2>
    <section class="carte act"><h3>📤 Fichier pour le Nuage</h3><p>En fin de séance : télécharge le fichier du carnet, puis dépose-le dans le dossier Nuage donné par le professeur.</p>
-    <button type="button" class="bt act pleine" data-act="exporter">Télécharger le carnet</button>${navigator.share ? `<button type="button" class="bt pleine" style="margin-top:8px" data-act="partager">Partager le fichier</button>` : ''}
+    <button type="button" class="bt act pleine" data-act="exporter">Télécharger le carnet</button>${CLASSES[B.classe] && CLASSES[B.classe].u ? `<a class="bt pleine" style="margin-top:8px" href="${esc(CLASSES[B.classe].u)}" target="_blank" rel="noopener">☁️ Ouvrir le dépôt Nuage de la classe</a>` : ''}${navigator.share ? `<button type="button" class="bt pleine" style="margin-top:8px" data-act="partager">Partager le fichier</button>` : ''}
     <p class="small muted">${der ? 'Dernier envoi : ' + esc(der) : 'Pas encore envoyé.'}</p></section>
    <section class="carte"><h3>Mots et défi</h3><p class="small">S1 et S2 : le QR pour le nuage de mots de la classe et le défi.</p><div class="rangee">${['S1', 'S2'].map(S => `<button type="button" class="bt mini" data-qr-s="${S}">QR ${S}</button>`).join('')}</div></section>
    <section class="carte"><h3>Ce téléphone</h3><p class="small">Les noms restent sur ce téléphone et dans le fichier envoyé au professeur. Rien n'est envoyé ailleurs.</p><div class="rangee"><button type="button" class="bt mini" data-act="fermerCarnet">Fermer le carnet</button><button type="button" class="bt mini danger" data-act="supprimer">Supprimer ce carnet</button></div></section>`;
@@ -540,6 +582,8 @@ document.addEventListener('click', async ev => {
   if(d.qui != null){P = +d.qui;rendre();return}
   if(d.seance){SEANCE = d.seance;rendre();window.scrollTo(0, 0);return}
   if(d.ouvrir){ouvrir(d.ouvrir);return}
+  if(d.selclasse){SEL = {classe:d.selclasse, noms:[]};rendre();return}
+  if(d.selnom){const i = SEL.noms.indexOf(d.selnom);i < 0 ? (SEL.noms.length < 3 ? SEL.noms.push(d.selnom) : toast('3 élèves au maximum.')) : SEL.noms.splice(i, 1);rendre();return}
   if(d.note && d.cle){const o = d.cle === 'echelle' ? null : objetCle(d.cle, true);if(o){o.note = +d.note;apresRessenti(d.cle)}T ? rendreTest() : rendre();return}
   if(d.mot != null && d.cle){const o = objetCle(d.cle, true);o.mot = o.mot === d.mot ? '' : d.mot;apresRessenti(d.cle);T ? rendreTest() : rendre();return}
   if(t.hasAttribute('data-autremot')){const m = (prompt('Ton mot :') || '').trim().slice(0, 30);if(!m)return;B.motsClasse = [...new Set((B.motsClasse || []).concat(m))];
@@ -578,6 +622,8 @@ document.addEventListener('click', async ev => {
   if(d.qrS){SEANCE = d.qrS;afficherQRMots();return}
   switch(d.act){
     case 'creer': creer();break;
+    case 'scanClasse': scanner();break;
+    case 'fermerScan': fermerFen();break;
     case 'demo': DEMO = true;B = binomeDemo();P = 0;ONGLET = 'seance';SEANCE = 'S4';rendre();window.scrollTo(0, 0);break;
     case 'quitterDemo': DEMO = false;B = null;rendre();break;
     case 'mobiles': panneauMobiles();break;
@@ -624,6 +670,11 @@ document.addEventListener('input', ev => {if(['lCm', 'lCh', 'lRp'].includes(ev.t
 document.addEventListener('keydown', ev => {if(ev.key === 'Enter' && ev.target.id === 'oCode'){const b = document.querySelector('[data-act="valCode"]');if(b)b.click()}});
 $('btMob').onclick = panneauMobiles;
 window.addEventListener('eps-avant-maj', () => sauver());
+
+/* ---------- Code du cours (eps-code.js) : la saisie d'une séance n'est ouverte qu'en cours ---------- */
+if(window.EPSCode)EPSCode.eleve({app:'mue', classe:() => B && !DEMO ? B.classe || '' : '', seance:() => SEANCE, seances:() => SEANCES_IDS,
+  nom:x => x + ' · ' + (seanceById(x) || {titre:''}).titre, ouvrir:x => {SEANCE = x;ONGLET = 'seance';rendre()}, zone:'#main',
+  actif:() => !!B && ONGLET === 'seance', libreSel:'.puces button,.qui button,[data-fiche],[data-libre],details summary,[data-act="mobiles"]', demo:() => DEMO, bandeau:true});
 
 /* ---------- Démarrage ---------- */
 if(/[?&]demo\b/.test(location.search)){DEMO = true;B = binomeDemo();SEANCE = 'S4'}

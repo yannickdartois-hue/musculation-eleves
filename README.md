@@ -6,4 +6,5 @@ Appli du binôme pour le cycle de musculation (9 séances) : questionnaire « Je
 - Données : sur le téléphone (localStorage), carnet protégé par un code à 4 chiffres (empreinte seulement).
 - Hors ligne : `sw.js` (cache `musculation-eleves-vN`, n'efface que ses propres caches) ; mise à jour par `eps-maj.js`.
 - Démo : bouton sur l'accueil ou adresse `?demo`.
-- Pas encore en v1.0 : code de cours (avec l'outil prof), lecture des carnets par l'outil prof, transmission en direct par Grist.
+- Classe : QR de la classe affiché par l'outil prof `musculation-prof` (liste Pronote, clé du code du cours, lien Nuage) ; les élèves choisissent leurs noms dans la liste. Code du cours : `eps-code.js` (saisie d'une séance ouverte 2 h, en cours).
+- Pas encore : transmission en direct par Grist.
