@@ -110,6 +110,9 @@ const ATELIERS = [
   crit:["Ballon contre la poitrine, coudes ouverts.","Pousser le plus vite possible vers le partenaire, bras tendus à la fin."], resp:"Souffler en lançant.", secu:"Le partenaire est prêt avant chaque lancer."}
 ];
 const atelier = id => ATELIERS.find(a => a.id === id);
+/* Illustrations des ateliers (fiche « Musculation : suivi du travail des élèves », dessins © Espace-musculation.com) */
+const IMAGES_AT = ["curlb", "mollets", "montee", "crunch", "squat", "extri", "rowb", "tirage", "elev", "twist", "dc", "fentes", "rowh", "curlh", "gainage", "pompes", "gainlat", "dips", "dch", "ecarte", "dm"];
+const imgAtelier = id => IMAGES_AT.includes(id) ? 'img/ateliers/' + id + '.jpg' : null;
 const CIRCUIT_S1 = ["curlb","crunch","tirage","dc","squat","fentes","extri","twist","rowh","rowb","dips","curlh"];
 const ATELIERS_TEST = ["dc","rowh","curlb","extri","dm","fentes"];
 
@@ -350,6 +353,7 @@ const SOURCES = [
  ["Aline Paintendre, UFR STAPS Reims","Démarche d'enseignement autour des ressentis : contraster, séquencer, trouver des correspondances, construire une grille."],
  ["Brzycki (1993)","Estimation de la charge maximale : charge × 36 / (37 − répétitions), fiable jusqu'à 10 répétitions."],
  ["Référentiel national CCF, BO n° 9 du 26 février 2026","AFL1 sur 12 points, AFL2 + AFL3 sur 8 points (répartition 6/2, 4/4, 2/6 au choix de l'élève), un rôle AFL3 parmi deux."],
+ ["Espace-musculation.com","Dessins des ateliers, repris de la fiche « Musculation : suivi du travail des élèves » de l'équipe EPS."],
  ["Équipe EPS, lycée G. Pompidou","Circuit de la séance 1 (fiche « Musculation : suivi du travail des élèves »), protocole CA5 réécrit pour 2026."]
 ];
 
@@ -427,7 +431,7 @@ function mobileHTML(k){
   return `<div class="mob" style="--mc:${m.coul}"><h3>${escM(m.nom)} <small>${escM(m.theme)}</small></h3><table>${l.map(([a, b]) => `<tr><th>${escM(a)}</th><td>${escM(b)}</td></tr>`).join('')}</table><p class="cap">${escM(m.forme)}</p></div>`;
 }
 function echelleHTML(){ return `<div class="ech">${ECHELLE.map(([n, t, d, c]) => `<div style="background:${c}"><b>${n}</b><span><b>${escM(t)}</b> ${escM(d)}</span></div>`).join('')}</div>`; }
-function ateliersHTML(ids){ return `<ul class="ats">${ids.map(id => { const a = atelier(id); return a ? `<li><b>${a.n ? a.n + '. ' : ''}${escM(a.nom)}</b> <span>${escM(a.groupe)} · ${escM(SUPPORTS[a.support].nom)}${a.places ? ` · ${a.places} binômes max` : ''}</span></li>` : ''; }).join('')}</ul>`; }
+function ateliersHTML(ids){ return `<ul class="ats">${ids.map(id => { const a = atelier(id); const im = imgAtelier(id);return a ? `<li>${im ? `<img class="vign" src="${im}" alt="" loading="lazy">` : ''}<b>${a.n ? a.n + '. ' : ''}${escM(a.nom)}</b> <span>${escM(a.groupe)} · ${escM(SUPPORTS[a.support].nom)}${a.places ? ` · ${a.places} binômes max` : ''}</span></li>` : ''; }).join('')}</ul>`; }
 function schema(spec){
   if(!spec) return '';
   if(spec.includes('+')) return spec.split('+').map(schema).join('');

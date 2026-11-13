@@ -193,13 +193,14 @@ function carteEchauffement(s1){
    <h4>Fin d'échauffement : note et mot</h4>${ressentiHTML('ech.fin', ech.fin)}</section>`;
 }
 function ficheAtelier(a){
-  return `<details><summary>Fiche : placement, respiration, sécurité</summary><p class="small muted">${esc(a.muscles)} · ${esc(SUPPORTS[a.support].nom)}</p><ul class="ats small">${a.crit.map(c => `<li>${esc(c)}</li>`).join('')}</ul><p class="small"><b>Respiration.</b> ${esc(a.resp)}</p><p class="small"><b>Sécurité.</b> ${esc(a.secu)}</p>${a.moins ? `<p class="small"><b>− Plus facile.</b> ${esc(a.moins)}</p>` : ''}${a.plus ? `<p class="small"><b>+ Plus difficile.</b> ${esc(a.plus)}</p>` : ''}</details>`;
+  const im = imgAtelier(a.id);
+  return `<details><summary>Fiche : placement, respiration, sécurité</summary>${im ? `<img class="illu" src="${im}" alt="${esc(a.nom)}" loading="lazy">` : ''}<p class="small muted">${esc(a.muscles)} · ${esc(SUPPORTS[a.support].nom)}</p><ul class="ats small">${a.crit.map(c => `<li>${esc(c)}</li>`).join('')}</ul><p class="small"><b>Respiration.</b> ${esc(a.resp)}</p><p class="small"><b>Sécurité.</b> ${esc(a.secu)}</p>${a.moins ? `<p class="small"><b>− Plus facile.</b> ${esc(a.moins)}</p>` : ''}${a.plus ? `<p class="small"><b>+ Plus difficile.</b> ${esc(a.plus)}</p>` : ''}</details>`;
 }
 function carteCircuit(){
   const s = sea(EL(), 'S1'), c = s.circuit || {};
   const fait = CIRCUIT_S1.filter(id => c[id]).length;
   return `<section class="carte"><h3>Circuit · 12 ateliers</h3><p class="small">5 min par atelier : 2 × 10 répétitions chacun, charge légère. On apprend le geste. <b>${fait}/12</b> faits.</p>
-   ${CIRCUIT_S1.map((id, i) => {const a = atelier(id);return `<div class="ex${c[id] ? ' fait' : ''}"><header><b>${a.n}. ${esc(a.nom)}</b><button type="button" class="bt mini${c[id] ? ' ok' : ''}" data-circuit="${id}">${c[id] ? '✓ Fait' : 'Fait'}</button></header>${ficheAtelier(a)}</div>`}).join('')}</section>`;
+   ${CIRCUIT_S1.map((id, i) => {const a = atelier(id);const im = imgAtelier(id);return `<div class="ex${c[id] ? ' fait' : ''}"><header>${im ? `<img class="vign" src="${im}" alt="" loading="lazy">` : ''}<b style="flex:1">${a.n}. ${esc(a.nom)}</b><button type="button" class="bt mini${c[id] ? ' ok' : ''}" data-circuit="${id}">${c[id] ? '✓ Fait' : 'Fait'}</button></header>${ficheAtelier(a)}</div>`}).join('')}</section>`;
 }
 const QUESTIONS = [
  {k:'freq', q:"Combien de fois par semaine fais-tu une activité physique (club, AS, salle, vélo, marche…) ?", o:['0','1','2','3','4','5 ou plus']},
@@ -336,7 +337,8 @@ function carteExo(at){
   const e = EL(), a = atelier(at), p = prevuDe(e, SEANCE, at), ex = (sea(e, SEANCE).exos || {})[at] || {};
   const r = ex.ressenti || {}, coh = ex.coh, aut = autre();
   const etat = ex.real ? (coh && !coh.ok ? ' alerte' : ' fait') : '';
-  let h = `<div class="ex${etat}" id="ex-${at}"><header><b>${esc(a.nom)}</b><span class="small muted">${esc(a.groupe)}</span></header>${prevuTexte(a, p)}`;
+  const im = imgAtelier(at);
+  let h = `<div class="ex${etat}" id="ex-${at}"><header>${im ? `<img class="vign" src="${im}" alt="" loading="lazy">` : ''}<b style="flex:1">${esc(a.nom)}</b><span class="small muted">${esc(a.groupe)}</span></header>${prevuTexte(a, p)}`;
   if(a.type === 'charge' && !(p && p.charge))h += `<p class="small">Pas encore de charge max sur cet atelier : <button type="button" class="lien" data-direct="${at}">saisie directe</button> (une série réussie entre 3 et 10 répétitions).</p>`;
   if(a.type === 'variante' && a.niveaux)h += `<div class="chips">${a.niveaux.map((t, i) => `<button type="button" class="${p && p.niv === i ? 'ici' : ''}" data-niv="${i}" data-at="${at}" title="${esc(t)}">Niv. ${i + 1}</button>`).join('')}</div>`;
   h += ficheAtelier(a);

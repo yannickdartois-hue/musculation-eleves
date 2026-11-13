@@ -10,7 +10,7 @@ window.EPS_AIDE = {
       {t:'Mes charges et la calculette', html:`<p>Onglet <b>Charges</b> : tes charges max, et pour chacune les charges de 30 à 80 % avec les disques à mettre. La <b>calculette libre</b> marche avec n'importe quelle charge.</p><p>Le bouton <span class="bouton">📋 Mobiles</span>, en bas à droite, rappelle à tout moment les 3 mobiles.</p>`},
       {t:'Mon projet (S6 à S9)', html:`<p>Onglet <b>Projet</b> : ton mobile, puis 4 à 6 exercices (6 en Tonification) sur le haut du corps, le bas du corps et le tronc. L'appli vérifie l'équilibre et la durée. En fin de séance, elle propose un <b>ajustement</b> : tu acceptes ou tu gardes, et tu dis pourquoi en une phrase.</p>`},
       {t:'Envoyer', html:`<p>En fin de séance, onglet <b>Envoyer</b> : <span class="bouton">Télécharger le carnet</span>, puis dépose le fichier dans le dossier Nuage donné par le professeur. En S1 et S2, montre aussi le <b>QR Mots et défi</b> : il ne contient aucun nom.</p>`},
-      {t:'Sécurité', html:`<p>Jamais d'effort à 100 %, jamais moins de 3 répétitions. Un pareur au développé couché. <b>Douleur dans une articulation : STOP</b>, tu préviens le professeur.</p>`}
+      {t:'Sécurité', html:`<p class="small">Dessins des ateliers : Espace-musculation.com.</p><p>Jamais d'effort à 100 %, jamais moins de 3 répétitions. Un pareur au développé couché. <b>Douleur dans une articulation : STOP</b>, tu préviens le professeur.</p>`}
     ]},
     {id:'prof', titre:'Professeur', chapitres:[
       {t:'Principe', html:`<p>L'appli suit le cycle de 9 séances de l'écran de cours <b>cycle-musculation</b> (même fichier de données). Les élèves l'ouvrent sur leur téléphone ; elle marche sans réseau après la première ouverture.</p>`},
