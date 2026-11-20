@@ -28,8 +28,12 @@ let SEANCE = 'S1';
 let DEMO = false;
 const ONGLETS = [['seance','🏋️','Séance'],['charges','⚖️','Charges'],['projet','🎯','Projet'],['carnet','📒','Carnet'],['envoyer','📤','Envoyer']];
 const SEANCES_IDS = SEANCES.map(s => s.id);
-const MOBILE_DU_JOUR = {S3:'tonif', S4:'volume', S5:'puiss'};
-const LISTES_DEFAUT = {S3:['pompes','rowh','fentes','montee','crunch','gainage'], S4:['dch','rowh','fentes','gainage'], S5:['sjump','fsaut','lancer','dch','dm']};
+/* v2.0 : S2-S3 tests, S4 tonification, S5 volume, S6 puissance et choix, S7 projet, S8-S9 évaluation */
+const MOBILE_DU_JOUR = {S4:'tonif', S5:'volume', S6:'puiss'};
+const LISTES_DEFAUT = {S4:['dch','rowh','dm','squath','fentes','hip'], S5:['dch','rowb','squath','sdtj'], S6:['dch','rowh','squath','hip']};
+const SEANCE_PROJET = 7, SEANCE_MOBILE = [4, 6];
+/* ateliers proposés pour un mobile : le menu (charges), et en Puissance seulement les 6 ateliers poussés vite */
+const dispoPour = mob => ATELIERS.filter(a => a.menu && (mob !== 'puiss' || a.puissance));
 const DEF_PARAM = {tonif:{pct:55, series:3, reps:15}, volume:{pct:70, series:4, reps:10}, puiss:{pct:45, series:4, reps:5}};
 const TEMPS = {tonif:'30 à 45 s', volume:'40 à 60 s', puiss:'15 s'};
 const FORME = [[1,'😫','Très fatigué'],[2,'😕','Fatigué'],[3,'😐','Normal'],[4,'🙂','En forme'],[5,'😀','Très en forme']];
@@ -154,11 +158,12 @@ function panneauMobiles(){
 function cmDe(e, at){const r = e.rm[at];return r && r.cm ? r.cm : null}
 function prevuDe(e, S, at){
   const a = atelier(at);let mob, p;
-  if(+S.slice(1) >= 6){const pr = e.projet;mob = pr && pr.mob;const x = pr && pr.exos.find(z => z.at === at);p = x ? {pct:x.pct, series:x.series, reps:x.reps, niv:x.niv} : null}
+  if(+S.slice(1) >= SEANCE_PROJET){const pr = e.projet;mob = pr && pr.mob;const x = pr && pr.exos.find(z => z.at === at);p = x ? {pct:x.pct, series:x.series, reps:x.reps, niv:x.niv} : null}
   else{mob = MOBILE_DU_JOUR[S];p = Object.assign({}, DEF_PARAM[mob])}
   if(!mob || !p)return null;
   if(a.type === 'variante' && p.niv == null)p.niv = e.niv[at] != null ? e.niv[at] : Math.min(1, (a.niveaux || []).length - 1);
-  const s = sea(e, S);if(s.forme && s.forme <= 2 && +S.slice(1) >= 3)p.series = Math.max(2, p.series - 1);
+  if(mob === 'puiss' && a.puissPct)p.pct = Math.min(a.puissPct[1], Math.max(a.puissPct[0], p.pct));   // v2.0 : fourchette propre à l'atelier
+  const s = sea(e, S);if(s.forme && s.forme <= 2 && +S.slice(1) >= 4)p.series = Math.max(2, p.series - 1);
   let charge = null;
   if(a.type === 'charge'){const cm = cmDe(e, at);if(cm)charge = chargeReelle(a.support, cm * p.pct / 100)}
   return Object.assign(p, {mob, charge});
@@ -214,24 +219,24 @@ function vueSeance(){
   const puces = `<div class="puces">${SEANCES_IDS.map(S => {const f = e.seances[S] && Object.keys(e.seances[S]).length;return `<button type="button" data-seance="${S}" class="${S === SEANCE ? 'ici' : ''}${f ? ' fait' : ''}">${S}</button>`}).join('')}</div>`;
   let h = puces + `<div class="rangee" style="justify-content:flex-end"><button type="button" class="bt mini" data-act="scanClasse" data-libre>📷 QR de la classe</button></div><h2>${SEANCE} · ${esc(s.titre)}</h2><p class="muted small">${esc(s.obj)}</p>`;
   const n = +SEANCE.slice(1);
-  if(n >= 3)h += carteForme();
-  if(n <= 2)h += carteEchauffement(n === 1);
+  if(n >= 4)h += carteForme();
+  if(n <= 3)h += carteEchauffement(n === 1);
   if(n === 1)h += carteCircuit() + carteSitue() + carteQRMots();
-  if(n === 2)h += carteTest() + carteDefi() + carteQRMots();
-  if(n >= 3 && n <= 5)h += carteMobile(MOBILE_DU_JOUR[SEANCE]) + listeExos(LISTES_DEFAUT[SEANCE]) ;
-  if(n === 5)h += carteComparer() + carteEchelle();
-  if(n >= 6){
+  if(n === 2 || n === 3)h += carteTest() + carteDefi() + carteQRMots();
+  if(n >= SEANCE_MOBILE[0] && n <= SEANCE_MOBILE[1])h += carteMobile(MOBILE_DU_JOUR[SEANCE]) + listeExos(LISTES_DEFAUT[SEANCE]) ;
+  if(n === SEANCE_MOBILE[1])h += carteComparer() + carteEchelle();
+  if(n >= SEANCE_PROJET){
     const pr = e.projet;
     if(!pr || !pr.exos.length)h += `<section class="carte act"><h3>🎯 Construis d'abord ton projet</h3><p>Mobile, 3 groupes musculaires, 4 à 6 exercices.</p><button type="button" class="bt act" data-onglet="projet">Construire mon projet</button></section>`;
-    else h += carteMobile(pr.mob) + listeExos(pr.exos.map(x => x.at), true) + (n <= 7 ? carteAjustements() : carteAnalyse());
-    if(n === 6)h += carteAfl();
+    else h += carteMobile(pr.mob) + listeExos(pr.exos.map(x => x.at), true) + (n === SEANCE_PROJET ? carteAjustements() : carteAnalyse());
+    if(n === SEANCE_PROJET)h += carteAfl();
   }
   return h;
 }
 function carteForme(){
   const s = sea(EL(), SEANCE), n = +SEANCE.slice(1);
   return `<section class="carte"><h3>Mon état de forme aujourd'hui</h3><div class="chips">${FORME.map(([v, i, t]) => `<button type="button" class="${s.forme === v ? 'ici' : ''}" data-forme="${v}">${i} ${t}</button>`).join('')}</div>
-   ${s.forme && s.forme <= 2 ? `<p class="retour non">Séance allégée aujourd'hui : une série de moins sur chaque exercice${n >= 6 ? ' (ton projet ne change pas)' : ''}.</p>` : ''}</section>`;
+   ${s.forme && s.forme <= 2 ? `<p class="retour non">Séance allégée aujourd'hui : une série de moins sur chaque exercice${n >= SEANCE_PROJET ? ' (ton projet ne change pas)' : ''}.</p>` : ''}</section>`;
 }
 function carteEchauffement(s1){
   const s = sea(EL(), SEANCE), ech = s.ech || {};
@@ -259,8 +264,8 @@ function ficheAtelier(a){
 function carteCircuit(){
   const s = sea(EL(), 'S1'), c = s.circuit || {};
   const fait = CIRCUIT_S1.filter(id => c[id]).length;
-  return `<section class="carte"><h3>Circuit · 12 ateliers</h3><p class="small">5 min par atelier : 2 × 10 répétitions chacun, charge légère. On apprend le geste. <b>${fait}/12</b> faits.</p>
-   ${CIRCUIT_S1.map((id, i) => {const a = atelier(id);return `<div class="ex${c[id] ? ' fait' : ''}"><header>${vignette(id)}<b style="flex:1">${a.n}. ${esc(a.nom)}</b><button type="button" class="bt mini${c[id] ? ' ok' : ''}" data-circuit="${id}">${c[id] ? '✓ Fait' : 'Fait'}</button></header></div>`}).join('')}</section>`;
+  return `<section class="carte"><h3>Circuit · ${CIRCUIT_S1.length} ateliers</h3><p class="small">4 min par atelier : 2 × 10 répétitions chacun, charge légère. On apprend le geste. <b>${fait}/${CIRCUIT_S1.length}</b> faits.</p>
+   ${CIRCUIT_S1.map((id, i) => {const a = atelier(id);return `<div class="ex${c[id] ? ' fait' : ''}"><header>${vignette(id)}<b style="flex:1">${i + 1}. ${esc(a.nom)}</b><button type="button" class="bt mini${c[id] ? ' ok' : ''}" data-circuit="${id}">${c[id] ? '✓ Fait' : 'Fait'}</button></header></div>`}).join('')}</section>`;
 }
 const QUESTIONS = [
  {k:'freq', q:"Combien de fois par semaine fais-tu une activité physique (club, AS, salle, vélo, marche…) ?", o:['0','1','2','3','4','5 ou plus']},
@@ -286,13 +291,15 @@ function carteSitue(){
   const m = suggestion(r);
   return `<section class="carte act"><h3>Je me situe · ${esc(prenom(e.nom))}</h3>
    ${QUESTIONS.map(Q => `<p><b>${esc(Q.q)}</b></p><div class="chips">${Q.o.map(o => {const [k, t] = Array.isArray(o) ? o : [o, o];const on = Q.multi ? (r[Q.k] || []).includes(k) : r[Q.k] === k;return `<button type="button" class="${on ? 'ici' : ''}" data-situe="${Q.k}" data-v="${esc(k)}"${Q.multi ? ' data-multi="1"' : ''}>${esc(t)}</button>`}).join('')}</div>`).join('')}
-   ${m ? `<p class="retour ok">Mobile suggéré : <b>${MOBILES[m].nom}</b> (${MOBILES[m].theme}). Tu les essaieras tous les trois avant de choisir en S5.</p>` : ''}</section>`;
+   ${m ? `<p class="retour ok">Mobile suggéré : <b>${MOBILES[m].nom}</b> (${MOBILES[m].theme}). Tu les essaieras tous les trois (S4 à S6) avant de choisir en S6.</p>` : ''}</section>`;
 }
 /* ---------- Test 10 RM ---------- */
 function carteTest(){
   const e = EL();
+  const nb = ATELIERS_TEST.filter(id => e.rm[id]).length, bas = ATELIERS_TEST.some(id => e.rm[id] && atelier(id).zone === 'bas');
   return `<section class="carte"><h3>Test 10 RM · ${esc(prenom(e.nom))}</h3><p class="small">La charge la plus lourde soulevée 10 fois sans No REP, en montant progressivement. Le partenaire tient le téléphone et juge.</p>
-   ${ATELIERS_TEST.map(id => {const a = atelier(id), r = e.rm[id];return `<div class="ex${r ? ' fait' : ''}"><header>${vignette(id)}<b style="flex:1">${esc(a.nom)}</b>${r ? `<span><b>${fmtKg(r.cm)}</b> <span class="small muted">${r.mode === 'direct' ? 'saisie directe' : 'test'}</span></span>` : ''}</header>
+   <p class="retour ${nb >= OBJ_TESTS[0] ? 'ok' : 'non'}"><b>${nb} charge${nb > 1 ? 's' : ''} max</b> sur ${ATELIERS_TEST.length} ateliers · objectif ${OBJ_TESTS[0]} à ${OBJ_TESTS[1]} à la fin de la S3 (4 à 5 par séance)${bas ? '' : ' · pense à un atelier du bas du corps'}.</p>
+   ${ATELIERS_TEST.slice().sort((x, y) => (e.rm[x] ? 1 : 0) - (e.rm[y] ? 1 : 0)).map(id => {const a = atelier(id), r = e.rm[id];return `<div class="ex${r ? ' fait' : ''}"><header>${vignette(id)}<b style="flex:1">${esc(a.nom)}</b>${r ? `<span><b>${fmtKg(r.cm)}</b> <span class="small muted">${r.mode === 'direct' ? 'saisie directe' : 'test'}</span></span>` : ''}</header>
      <div class="rangee"><button type="button" class="bt mini act" data-test="${id}">${r ? 'Refaire le test' : 'Commencer le test'}</button><button type="button" class="bt mini" data-direct="${id}">Saisie directe</button></div></div>`}).join('')}</section>`;
 }
 let T = null; // test en cours
@@ -363,10 +370,10 @@ function defiBinome(){
 function carteDefi(){
   const d = defiBinome();
   return `<section class="carte"><h3>Défi par équipes</h3><p class="small">Votre équipe (donnée par le professeur) :</p><div class="chips">${['A','B','C','D'].map(x => `<button type="button" class="${B.equipe === x ? 'ici' : ''}" data-equipe="${x}">Équipe ${x}</button>`).join('')}</div>
-   <p>Votre binôme rapporte <b>${fmtKg(d.kg)}</b> et <b>${d.q}</b> points de qualité.</p><p class="small muted">Kilos : la meilleure charge à 10 répétitions de chacun, sur les 6 ateliers. Qualité : + 1 par série sans No REP, + 2 par montée progressive, − 1 par No REP.</p></section>`;
+   <p>Votre binôme rapporte <b>${fmtKg(d.kg)}</b> et <b>${d.q}</b> points de qualité.</p><p class="small muted">Kilos : la meilleure charge à 10 répétitions de chacun, sur tous les ateliers testés en S2 et S3. Qualité : + 1 par série sans No REP, + 2 par montée progressive, − 1 par No REP.</p></section>`;
 }
 /* ---------- QR « Mots et défi » (aucun nom) ---------- */
-function carteQRMots(){return `<section class="carte info"><h3>Fin de séance : mots${SEANCE === 'S2' ? ' et défi' : ''}</h3><p class="small">Montre ce QR au professeur : il ajoute vos mots au nuage de la classe${SEANCE === 'S2' ? ' et vos points au défi' : ''}. Aucun nom n'est transmis.</p><button type="button" class="bt act" data-act="qrMots">Afficher le QR</button></section>`}
+function carteQRMots(){return `<section class="carte info"><h3>Fin de séance : mots${SEANCE === 'S2' || SEANCE === 'S3' ? ' et défi' : ''}</h3><p class="small">Montre ce QR au professeur : il ajoute vos mots au nuage de la classe${SEANCE === 'S2' || SEANCE === 'S3' ? ' et vos points au défi' : ''}. Aucun nom n'est transmis.</p><button type="button" class="bt act" data-act="qrMots">Afficher le QR</button></section>`}
 function motsSeance(S){
   const debut = [], fin = [];
   B.e.forEach(e => {const s = e.seances[S] || {}, ech = s.ech || {};if(ech.debut && ech.debut.mot)debut.push(ech.debut.mot);if(ech.fin && ech.fin.mot)fin.push(ech.fin.mot);
@@ -382,7 +389,7 @@ async function chaineQR(o){
 function svgQR(txt){const q = qrcode(0, 'M');q.addData(txt);q.make();return q.createSvgTag({cellSize:6, margin:2, scalable:true})}
 async function afficherQRMots(){
   const m = motsSeance(SEANCE), o = {a:'MUS', t:'mots', b:B.id.slice(0, 8), s:SEANCE, debut:m.debut, fin:m.fin};
-  if(SEANCE === 'S2' && B.equipe){const d = defiBinome();o.defi = {e:B.equipe, kg:d.kg, q:d.q}}
+  if((SEANCE === 'S2' || SEANCE === 'S3') && B.equipe){const d = defiBinome();o.defi = {e:B.equipe, kg:d.kg, q:d.q}}
   const txt = await chaineQR(o);
   fenetre(`<h3>Mots${o.defi ? ' et défi' : ''} · ${SEANCE}</h3><div class="qr">${svgQR(txt)}</div><p class="small">${m.debut.length + m.fin.length} mot(s)${o.defi ? ` · équipe ${o.defi.e} : ${fmtKg(o.defi.kg)}, ${o.defi.q} pts de qualité` : SEANCE === 'S2' ? ' · ⚠️ choisis ton équipe pour le défi' : ''}</p><button type="button" class="bt pleine" data-act="fermerFen">Fermer</button>`);
 }
@@ -402,6 +409,7 @@ function carteExo(at){
   if(a.type === 'variante' && a.niveaux)h += `<div class="chips">${a.niveaux.map((t, i) => `<button type="button" class="${p && p.niv === i ? 'ici' : ''}" data-niv="${i}" data-at="${at}" title="${esc(t)}">Niv. ${i + 1}</button>`).join('')}</div>`;
   if(!ex.real)h += `<div class="rangee"><button type="button" class="bt ok" data-fait="${at}">✓ Fait comme prévu</button><button type="button" class="bt" data-modif="${at}">Fait autrement</button></div>`;
   else h += `<p class="small">✓ Réalisé : ${ex.real.series} séries × ${ex.real.reps}${a.temps ? ' s' : ' rép.'}${ex.real.charge ? ' à ' + fmtKg(ex.real.charge) : ''}${ex.real.diff ? ' <b>(différent du prévu)</b>' : ''} <button type="button" class="lien" data-modif="${at}">modifier</button></p>
+    ${p && p.mob === 'puiss' ? `<div class="rangee"><button type="button" class="bt mini${ex.vit ? ' danger' : ''}" data-vit="${at}">⚡ ${ex.vit ? 'La vitesse a baissé (noté)' : 'La vitesse a baissé avant la fin'}</button></div>${ex.vit ? '<p class="retour non">Le partenaire a vu la vitesse baisser : la prochaine fois, une répétition de moins ou 5 % de charge en moins.</p>' : ''}` : ''}
     <h4>Mon ressenti</h4>${ressentiHTML('exos.' + at + '.ressenti', r, true)}
     ${coh ? `<p class="retour ${coh.stop ? 'stop' : coh.ok ? 'ok' : 'non'}">${coh.ok ? '✅ ' : coh.stop ? '⛔ ' : '⚠️ '}${esc(coh.msg)}</p>` : ''}
     ${aut ? `<details${ex.avis ? ' open' : ''}><summary>👀 Avis du partenaire (${esc(prenom(aut.nom))})</summary><p class="small">Signes vus pendant la série :</p><div class="chips">${SIGNES.map(sg => `<button type="button" class="${ex.avis && ex.avis.signes.includes(sg) ? 'ici' : ''}" data-signe="${esc(sg)}" data-at="${at}">${esc(sg)}</button>`).join('')}</div>
@@ -418,12 +426,12 @@ function modifierExo(at){
 }
 function changerListe(){
   const S = SEANCE, l = B.listes[S] || LISTES_DEFAUT[S], mob = MOBILE_DU_JOUR[S];
-  const dispo = ATELIERS.filter(a => mob === 'puiss' ? (a.puissance || a.type === 'charge') : !a.puissance);
-  fenetre(`<h3>Exercices de ${S} (${esc(MOBILES[mob].nom)})</h3><p class="small muted">Gardez au moins un exercice du haut du corps, un du bas et un du tronc${mob === 'puiss' ? ' (en Puissance : sauts pour le bas du corps)' : ''}.</p>
+  const dispo = dispoPour(mob);
+  fenetre(`<h3>Exercices de ${S} (${esc(MOBILES[mob].nom)})</h3><p class="small muted">Gardez au moins un exercice du haut du corps et un du bas${mob === 'puiss' ? ' (en Puissance : squat haltères ou hip thrust)' : ''}.</p>
    ${l.map((id, i) => `<label class="ch">Exercice ${i + 1}</label><select data-liste="${i}">${dispo.map(a => `<option value="${a.id}"${a.id === id ? ' selected' : ''}>${esc(a.nom)} · ${a.zone}</option>`).join('')}</select>`).join('')}
    <div class="rangee" style="margin-top:12px"><button type="button" class="bt act" data-act="valListe">Enregistrer</button><button type="button" class="bt" data-act="fermerFen">Annuler</button></div>`);
 }
-/* ---------- S5 : comparer, choisir, échelle ---------- */
+/* ---------- S6 : comparer, choisir, échelle ---------- */
 function statsMobile(e, S){
   const ex = Object.values((e.seances[S] || {}).exos || {}).filter(x => x.ressenti && x.ressenti.note);
   if(!ex.length)return null;
@@ -434,7 +442,7 @@ function statsMobile(e, S){
 function carteComparer(){
   const e = EL(), c = e.choix || {};
   return `<section class="carte act"><h3>Comparer et choisir · ${esc(prenom(e.nom))}</h3><table class="tb"><tr><th>Mobile</th><th>Note moyenne</th><th>Cohérent</th><th>Mes mots</th></tr>
-   ${['S3', 'S4', 'S5'].map(S => {const m = MOBILE_DU_JOUR[S], st = statsMobile(e, S);return `<tr><td><b style="color:${MOBILES[m].coul}">${MOBILES[m].nom}</b></td><td>${st ? st.moy : '—'}</td><td>${st ? st.ok + '/' + st.n : '—'}</td><td>${st ? esc(st.mots.join(', ')) : ''}</td></tr>`}).join('')}</table>
+   ${Object.keys(MOBILE_DU_JOUR).map(S => {const m = MOBILE_DU_JOUR[S], st = statsMobile(e, S);return `<tr><td><b style="color:${MOBILES[m].coul}">${MOBILES[m].nom}</b></td><td>${st ? st.moy : '—'}</td><td>${st ? st.ok + '/' + st.n : '—'}</td><td>${st ? esc(st.mots.join(', ')) : ''}</td></tr>`}).join('')}</table>
    ${e.situe && suggestion(e.situe) ? `<p class="small muted">En S1, « Je me situe » suggérait : ${MOBILES[suggestion(e.situe)].nom}.</p>` : ''}
    <h4>Mon mobile pour le projet</h4><div class="chips">${MOBILES_ORDRE.map(m => `<button type="button" class="${c.mob === m ? 'ici' : ''}" data-choix="${m}">${MOBILES[m].nom} · ${MOBILES[m].theme}</button>`).join('')}</div>
    <label class="ch" for="choixPq">Pourquoi ? Quelle sensation te le dit ?</label><textarea id="choixPq" data-texte="choix">${esc(c.pourquoi || '')}</textarea></section>`;
@@ -445,7 +453,7 @@ function carteEchelle(){
    ${ECHELLE.map(([n, t, d, c]) => `<div class="rangee" style="margin:4px 0"><span style="background:${c};border-radius:10px;min-width:44px;text-align:center;font:800 22px/44px var(--d);color:#1c2128">${n}</span><span class="small" style="flex:1">${esc(t)}</span><select data-echelle="${n}" style="flex:1.2;min-height:44px"><option value="">—</option>${[...new Set(voc.concat(e.echelle[n] ? [e.echelle[n]] : []))].map(m => `<option${e.echelle[n] === m ? ' selected' : ''}>${esc(m)}</option>`).join('')}</select></div>`).join('')}
    <p class="small"><button type="button" class="lien" data-autremot data-cle="echelle">✏️ ajouter un mot à ma liste</button></p></section>`;
 }
-/* ---------- S6-S9 : ajustements, analyse, AFL ---------- */
+/* ---------- S7-S9 : ajustements, analyse, AFL ---------- */
 function carteAjustements(){
   const e = EL(), pr = e.projet, s = sea(e, SEANCE), ex = s.exos || {};
   const l = pr.exos.filter(x => ex[x.at] && ex[x.at].coh);
@@ -462,17 +470,17 @@ function carteAnalyse(){
   return `<section class="carte act"><h3>Mon analyse</h3><p class="small">En 2 phrases : ce qui était conforme à ton mobile, ce que tu changerais.</p><textarea data-texte="analyse">${esc(s.analyse || '')}</textarea></section>`;
 }
 function carteAfl(){
-  const e = EL(), verrou = e.seances.S7 && Object.keys(e.seances.S7).length;
-  return `<section class="carte"><h3>Mon évaluation AFL2 et AFL3</h3><p class="small">Choix à faire en S6 ; ${verrou ? '<b>verrouillé depuis la S7</b>' : 'il se verrouille dès que tu commences la S7'}.</p>
+  const e = EL(), verrou = e.seances.S8 && Object.keys(e.seances.S8).length;
+  return `<section class="carte"><h3>Mon évaluation AFL2 et AFL3</h3><p class="small">Choix à faire en S7 ; ${verrou ? '<b>verrouillé depuis la S8</b>' : 'il se verrouille dès que tu commences la S7'}.</p>
    <h4>Répartition des 8 points</h4><div class="chips">${EVAL.repartitions.map(([k, t]) => `<button type="button" class="${e.afl.rep === k ? 'ici' : ''}" data-afl="${k}"${verrou ? ' disabled' : ''}>${esc(t)}</button>`).join('')}</div>
    <h4>Mon rôle évalué (AFL3)</h4>${EVAL.roles.map(([k, t, d]) => `<button type="button" class="bt pleine${e.afl.role === k ? ' noir' : ''}" style="margin:4px 0;justify-content:flex-start;text-align:left;height:auto;padding:8px 14px;flex-direction:column;align-items:flex-start" data-role="${k}"${verrou ? ' disabled' : ''}><span>${esc(t)}</span><span class="small" style="font-weight:400">${esc(d)}</span></button>`).join('')}</section>`;
 }
 
 /* ================== Vue : charges ================== */
 function vueCharges(){
-  const e = EL(), ats = ATELIERS.filter(a => a.type === 'charge');
-  return `<h2>Mes charges · ${esc(prenom(e.nom))}</h2>
-   <section class="carte"><table class="tb"><tr><th>Atelier</th><th>Charge max</th><th></th></tr>${ats.map(a => {const r = e.rm[a.id];return `<tr><td>${esc(a.nom)}${a.test ? ' <span class="small muted">test</span>' : ''}</td><td>${r ? `<b>${fmtKg(r.cm)}</b><br><span class="small muted">${r.mode === 'direct' ? 'saisie directe' : 'test'} · ${esc(r.date)}</span>` : '—'}</td><td><button type="button" class="bt mini" data-calc="${a.id}"${r ? '' : ' disabled'}>%</button> <button type="button" class="bt mini" data-direct="${a.id}">✏️</button></td></tr>`}).join('')}</table></section>
+  const e = EL(), ats = ATELIERS.filter(a => a.menu), nb = ats.filter(a => e.rm[a.id]).length;
+  return `<h2>Mes charges · ${esc(prenom(e.nom))}</h2><p class="retour ${nb >= OBJ_TESTS[0] ? 'ok' : 'non'}"><b>${nb} / ${ats.length}</b> charges max · objectif ${OBJ_TESTS[0]} à ${OBJ_TESTS[1]} à la fin de la S3. Un atelier sans charge max ne peut pas entrer dans ton projet.</p>
+   <section class="carte"><table class="tb"><tr><th>Atelier</th><th>Charge max</th><th></th></tr>${ats.map(a => {const r = e.rm[a.id];return `<tr><td>${esc(a.nom)} <span class="small muted">${esc(a.groupe)}</span></td><td>${r ? `<b>${fmtKg(r.cm)}</b><br><span class="small muted">${r.mode === 'direct' ? 'saisie directe' : 'test'} · ${esc(r.date)}</span>` : '—'}</td><td><button type="button" class="bt mini" data-calc="${a.id}"${r ? '' : ' disabled'}>%</button> <button type="button" class="bt mini" data-direct="${a.id}">✏️</button></td></tr>`}).join('')}</table></section>
    <section class="carte info"><h3>🧮 Calculette libre</h3><p class="small">Tape une charge max et choisis le matériel : l'appli donne les charges de 30 à 80 % et les disques à mettre.</p><button type="button" class="bt" data-act="calcLibre">Ouvrir la calculette</button></section>`;
 }
 function tableauCharges(sup, cm){
@@ -497,8 +505,9 @@ function controleProjet(pr){
   const m = MOBILES[pr.mob], l = [], zones = new Set(pr.exos.map(x => atelier(x.at).zone));
   const n = pr.exos.length;
   if(n < m.nbEx[0] || n > m.nbEx[1])l.push([false, `${m.nom} : ${m.nbEx[0] === m.nbEx[1] ? m.nbEx[0] : m.nbEx[0] + ' à ' + m.nbEx[1]} exercices (tu en as ${n}).`]);else l.push([true, `${n} exercices.`]);
-  ['haut', 'bas', 'tronc'].forEach(z => {if(!zones.has(z))l.push([false, `Il manque un exercice ${z === 'haut' ? 'du haut du corps' : z === 'bas' ? 'du bas du corps' : 'du tronc'} (développement harmonieux).`])});
-  if(zones.size === 3)l.push([true, 'Haut du corps, bas du corps et tronc : équilibré.']);
+  ['haut', 'bas'].forEach(z => {if(!zones.has(z))l.push([false, `Il manque un exercice ${z === 'haut' ? 'du haut du corps' : 'du bas du corps'} (développement harmonieux).`])});
+  if(zones.has('haut') && zones.has('bas'))l.push([true, 'Haut et bas du corps : équilibré.']);
+  pr.exos.forEach(x => {const a = atelier(x.at);if(!a.menu)l.push([false, `${a.nom} : n'est plus proposé (poids du corps, à l'échauffement). Remplace-le.`]);else if(pr.mob === 'puiss' && !a.puissance)l.push([false, `${a.nom} : ne se travaille pas en Puissance (geste lent ou dos chargé).`])});
   const d = dureeProjet(pr.mob, pr.exos);l.push([d <= 60, `Durée estimée en binôme : ${d} min ${d <= 60 ? '(tient dans la séance)' : '(trop long : enlève un exercice ou une série)'}.`]);
   pr.exos.forEach(x => {const a = atelier(x.at);if(a.places)l.push([true, `${a.nom} : ${a.places} binômes au maximum en même temps, prévois une variante.`]);
     if(a.type === 'charge' && !cmDe(EL(), x.at))l.push([false, `${a.nom} : pas de charge max (saisie directe dans Charges).`])});
@@ -507,15 +516,15 @@ function controleProjet(pr){
 function vueProjet(){
   const e = EL(), pr = e.projet;
   if(!pr){const m = (e.choix && e.choix.mob) || null;
-    return `<h2>Mon projet · ${esc(prenom(e.nom))}</h2><section class="carte act"><p>Choisis ton mobile${m ? ` (en S5 tu as choisi : <b>${MOBILES[m].nom}</b>)` : ''} :</p><div class="chips">${MOBILES_ORDRE.map(k => `<button type="button" class="${m === k ? 'ici' : ''}" data-nouveau-projet="${k}">${MOBILES[k].nom}</button>`).join('')}</div></section>${MOBILES_ORDRE.map(mobileHTML).join('')}`}
+    return `<h2>Mon projet · ${esc(prenom(e.nom))}</h2><section class="carte act"><p>Choisis ton mobile${m ? ` (en S6 tu as choisi : <b>${MOBILES[m].nom}</b>)` : ''} :</p><div class="chips">${MOBILES_ORDRE.map(k => `<button type="button" class="${m === k ? 'ici' : ''}" data-nouveau-projet="${k}">${MOBILES[k].nom}</button>`).join('')}</div></section>${MOBILES_ORDRE.map(mobileHTML).join('')}`}
   const m = MOBILES[pr.mob], ctrl = controleProjet(pr);
-  const dispo = ATELIERS.filter(a => pr.mob === 'puiss' ? (a.puissance || a.type === 'charge') : !a.puissance).filter(a => !pr.exos.some(x => x.at === a.id));
+  const dispo = dispoPour(pr.mob).filter(a => !pr.exos.some(x => x.at === a.id));
   return `<h2>Mon projet · ${esc(prenom(e.nom))}</h2>
    <section class="carte"><p>Mobile : <b style="color:${m.coul}">${m.nom}</b> (${m.theme}) · ${m.pct[0]}-${m.pct[1]} % · ${m.series[0]}-${m.series[1]} séries · ${m.reps[0]}-${m.reps[1]} rép. · récup ${m.recup}</p><button type="button" class="lien" data-act="changerMobile">changer de mobile</button></section>
    ${pr.exos.map((x, i) => {const a = atelier(x.at);return `<div class="ex"><header><b>${i + 1}. ${esc(a.nom)}</b><button type="button" class="bt mini danger" data-retirer="${i}">Retirer</button></header><p class="small muted">${esc(a.groupe)} · ${a.zone}</p>
      <div class="rangee">${pasHTML(i, 'series', x.series, 'séries')}${a.temps ? '' : pasHTML(i, 'reps', x.reps, 'rép.')}${a.type === 'charge' ? pasHTML(i, 'pct', x.pct, '%') : ''}</div>
      ${a.niveaux ? `<div class="chips">${a.niveaux.map((t, k) => `<button type="button" class="${x.niv === k ? 'ici' : ''}" data-pniv="${i}" data-k="${k}" title="${esc(t)}">Niv. ${k + 1}</button>`).join('')}</div>` : ''}</div>`}).join('')}
-   <section class="carte"><label class="ch" for="ajEx">Ajouter un exercice</label><select id="ajEx"><option value="">—</option>${['haut', 'bas', 'tronc'].map(z => `<optgroup label="${z === 'haut' ? 'Haut du corps' : z === 'bas' ? 'Bas du corps' : 'Tronc'}">${dispo.filter(a => a.zone === z).map(a => `<option value="${a.id}">${esc(a.nom)}</option>`).join('')}</optgroup>`).join('')}</select></section>
+   <section class="carte"><label class="ch" for="ajEx">Ajouter un exercice</label><select id="ajEx"><option value="">—</option>${['haut', 'bas'].map(z => `<optgroup label="${z === 'haut' ? 'Haut du corps' : 'Bas du corps'}">${dispo.filter(a => a.zone === z).map(a => `<option value="${a.id}">${esc(a.nom)}</option>`).join('')}</optgroup>`).join('')}</select></section>
    <section class="carte ${ctrl.every(c => c[0]) ? 'info' : ''}"><h3>Vérification</h3>${ctrl.map(([ok, t]) => `<p class="small">${ok ? '✅' : '⚠️'} ${esc(t)}</p>`).join('')}</section>
    ${e.ajust.length ? `<section class="carte"><h3>Mes ajustements</h3>${e.ajust.map(a => `<p class="small"><b>${a.S} · ${esc(atelier(a.at).nom)}</b> : ${esc(a.txt)}${a.pourquoi ? ' · « ' + esc(a.pourquoi) + ' »' : ''}</p>`).join('')}</section>` : ''}`;
 }
@@ -542,7 +551,7 @@ function vueEnvoyer(){
    <section class="carte act"><h3>📤 Fichier pour le Nuage</h3><p>En fin de séance : télécharge le fichier du carnet, puis dépose-le dans le dossier Nuage donné par le professeur.</p>
     <button type="button" class="bt act pleine" data-act="exporter">Télécharger le carnet</button>${CLASSES[B.classe] && CLASSES[B.classe].u ? `<a class="bt pleine" style="margin-top:8px" href="${esc(CLASSES[B.classe].u)}" target="_blank" rel="noopener">☁️ Ouvrir le dépôt Nuage de la classe</a>` : ''}${navigator.share ? `<button type="button" class="bt pleine" style="margin-top:8px" data-act="partager">Partager le fichier</button>` : ''}
     <p class="small muted">${der ? 'Dernier envoi : ' + esc(der) : 'Pas encore envoyé.'}</p></section>
-   <section class="carte"><h3>Mots et défi</h3><p class="small">S1 et S2 : le QR pour le nuage de mots de la classe et le défi.</p><div class="rangee">${['S1', 'S2'].map(S => `<button type="button" class="bt mini" data-qr-s="${S}">QR ${S}</button>`).join('')}</div></section>
+   <section class="carte"><h3>Mots et défi</h3><p class="small">S1, S2 et S3 : le QR pour le nuage de mots de la classe et le défi.</p><div class="rangee">${['S1', 'S2', 'S3'].map(S => `<button type="button" class="bt mini" data-qr-s="${S}">QR ${S}</button>`).join('')}</div></section>
    <section class="carte"><h3>Ce téléphone</h3><p class="small">Les noms restent sur ce téléphone et dans le fichier envoyé au professeur. Rien n'est envoyé ailleurs.</p><div class="rangee"><button type="button" class="bt mini" data-act="fermerCarnet">Fermer le carnet</button><button type="button" class="bt mini danger" data-act="supprimer">Supprimer ce carnet</button></div></section>`;
 }
 function fichierCarnet(){
@@ -564,17 +573,17 @@ function binomeDemo(){
   const e1 = nouvelEleve('Léa MARTIN'), e2 = nouvelEleve('Hugo BERNARD');
   e1.situe = {freq:'2', bien:'Oui', ecran:'2 à 4 h', envie:['galbe', 'tonus']};e2.situe = {freq:'4', bien:'Oui', ecran:'Moins de 2 h', envie:['sport']};
   const rm = (e, l) => l.forEach(([at, cm]) => e.rm[at] = {cm, charge:Math.round(cm * .75), reps:10, date:'2026-11-17', mode:'test'});
-  rm(e1, [['dch', 14], ['dc', 24], ['rowh', 12], ['curlb', 16], ['extri', 14], ['dm', 8], ['fentes', 10]]);
-  rm(e2, [['dch', 22], ['dc', 40], ['rowh', 18], ['curlb', 26], ['extri', 22], ['dm', 13], ['fentes', 16]]);
+  rm(e1, [['dch', 14], ['dc', 24], ['rowh', 12], ['curlb', 16], ['extri', 14], ['dm', 8], ['fentes', 10], ['squath', 16], ['hip', 30], ['rowb', 20]]);
+  rm(e2, [['dch', 22], ['dc', 40], ['rowh', 18], ['curlb', 26], ['extri', 22], ['dm', 13], ['fentes', 16], ['squath', 24], ['sdtj', 20]]);
   e1.tests.dc = {series:[{charge:12, valides:10, norep:0}, {charge:16, valides:10, norep:0}, {charge:20, valides:7, norep:1}], ressentis:{premiere:{note:4, mot:'léger'}, derniere:{note:8, mot:'ça brûle'}}};
   e1.seances.S1 = {ech:{pouls:148, debut:{note:3, mot:'chaud'}, fin:{note:5, mot:'essoufflé'}}, circuit:Object.fromEntries(CIRCUIT_S1.slice(0, 10).map(x => [x, true]))};
-  e1.seances.S3 = {forme:4, exos:{pompes:{real:{series:3, reps:15}, ressenti:{note:6, mot:'ça picote', sens:'locale'}}, rowh:{real:{series:3, reps:15, charge:7}, ressenti:{note:4, mot:'léger', sens:'rien'}}}};
-  e1.seances.S4 = {forme:3, exos:{dch:{real:{series:4, reps:10, charge:8}, ressenti:{note:8, mot:'ça gonfle', sens:'brulure'}}, fentes:{real:{series:4, reps:10, charge:7}, ressenti:{note:8, mot:'ça brûle', sens:'brulure'}}}};
-  e1.seances.S5 = {forme:4, exos:{sjump:{real:{series:4, reps:5}, ressenti:{note:6, mot:'compact', sens:'tension'}}}};
-  [['S3', 'tonif'], ['S4', 'volume'], ['S5', 'puiss']].forEach(([S, m]) => Object.values(e1.seances[S].exos).forEach(x => x.coh = coherence(m, x.ressenti.note, x.ressenti.sens)));
+  e1.seances.S4 = {forme:4, exos:{dch:{real:{series:3, reps:15, charge:7}, ressenti:{note:6, mot:'ça picote', sens:'locale'}}, rowh:{real:{series:3, reps:15, charge:7}, ressenti:{note:4, mot:'léger', sens:'rien'}}}};
+  e1.seances.S5 = {forme:3, exos:{dch:{real:{series:4, reps:10, charge:10}, ressenti:{note:8, mot:'ça gonfle', sens:'brulure'}}, squath:{real:{series:4, reps:10, charge:11}, ressenti:{note:8, mot:'ça brûle', sens:'brulure'}}}};
+  e1.seances.S6 = {forme:4, exos:{hip:{real:{series:4, reps:5, charge:14}, ressenti:{note:6, mot:'compact', sens:'tension'}}}};
+  [['S4', 'tonif'], ['S5', 'volume'], ['S6', 'puiss']].forEach(([S, m]) => Object.values(e1.seances[S].exos).forEach(x => x.coh = coherence(m, x.ressenti.note, x.ressenti.sens)));
   e1.choix = {mob:'volume', pourquoi:"C'est en Volume que j'ai senti mes muscles gonfler, et c'est ce que je cherche."};
   e1.echelle = {3:'léger', 5:'chaud', 6:'ça picote', 7:'ça brûle', 8:'ça gonfle', 10:'je bloque'};
-  e1.projet = {mob:'volume', exos:[{at:'dch', series:4, reps:10, pct:70}, {at:'rowh', series:4, reps:10, pct:70}, {at:'fentes', series:4, reps:10, pct:70}, {at:'gainage', series:4, reps:10, pct:70, niv:1}]};
+  e1.projet = {mob:'volume', exos:[{at:'dch', series:4, reps:10, pct:70}, {at:'rowh', series:4, reps:10, pct:70}, {at:'squath', series:4, reps:10, pct:70}, {at:'hip', series:4, reps:10, pct:70}]};
   e1.afl = {rep:'4/4', role:'coach'};
   return {id:'demo0000', v:1, app:'musculation-eleves', classe:'DÉMO', cree:jour(), equipe:'B', listes:{}, motsClasse:['ça tape', 'lourd'], envois:[], e:[e1, e2]};
 }
@@ -596,6 +605,7 @@ document.addEventListener('click', async ev => {
     if(d.cle !== 'echelle'){const o = objetCle(d.cle, true);o.mot = m;apresRessenti(d.cle)}else sauver();T ? rendreTest() : rendre();return}
   if(d.sens && d.cle){const o = objetCle(d.cle, true);o.sens = d.sens;apresRessenti(d.cle);rendre();return}
   if(d.forme){sea(EL(), SEANCE).forme = +d.forme;sauver();rendre();return}
+  if(d.vit){const s = sea(EL(), SEANCE);s.exos = s.exos || {};const x = s.exos[d.vit] = s.exos[d.vit] || {};x.vit = !x.vit;sauver();rendre();return}
   if(d.circuit){const s = sea(EL(), 'S1');s.circuit = s.circuit || {};s.circuit[d.circuit] = !s.circuit[d.circuit];sauver();rendre();return}
   if(d.situe){const e = EL();e.situe = e.situe || {};if(d.multi){const l = e.situe[d.situe] = e.situe[d.situe] || [];const i = l.indexOf(d.v);i < 0 ? l.push(d.v) : l.splice(i, 1)}else e.situe[d.situe] = d.v;sauver();rendre();return}
   if(d.fiche){ouvrirFiche(d.fiche);return}
@@ -630,7 +640,7 @@ document.addEventListener('click', async ev => {
     case 'creer': creer();break;
     case 'scanClasse': scanner();break;
     case 'fermerScan': fermerFen();break;
-    case 'demo': DEMO = true;B = binomeDemo();P = 0;ONGLET = 'seance';SEANCE = 'S4';rendre();window.scrollTo(0, 0);break;
+    case 'demo': DEMO = true;B = binomeDemo();P = 0;ONGLET = 'seance';SEANCE = 'S5';rendre();window.scrollTo(0, 0);break;
     case 'quitterDemo': DEMO = false;B = null;rendre();break;
     case 'mobiles': panneauMobiles();break;
     case 'calcLibre': calcLibre();break;
@@ -683,6 +693,6 @@ if(window.EPSCode)EPSCode.eleve({app:'mue', classe:() => B && !DEMO ? B.classe |
   actif:() => !!B && ONGLET === 'seance', libreSel:'.puces button,.qui button,[data-fiche],[data-libre],details summary,[data-act="mobiles"]', demo:() => DEMO, bandeau:true});
 
 /* ---------- Démarrage ---------- */
-if(/[?&]demo\b/.test(location.search)){DEMO = true;B = binomeDemo();SEANCE = 'S4'}
+if(/[?&]demo\b/.test(location.search)){DEMO = true;B = binomeDemo();SEANCE = 'S5'}
 rendre();
 if('serviceWorker' in navigator)window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
