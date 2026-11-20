@@ -158,7 +158,8 @@ function panneauMobiles(){
 function cmDe(e, at){const r = e.rm[at];return r && r.cm ? r.cm : null}
 function prevuDe(e, S, at){
   const a = atelier(at);let mob, p;
-  if(+S.slice(1) >= SEANCE_PROJET){const pr = e.projet;mob = pr && pr.mob;const x = pr && pr.exos.find(z => z.at === at);p = x ? {pct:x.pct, series:x.series, reps:x.reps, niv:x.niv} : null}
+  if(+S.slice(1) >= SEANCE_PROJET){const pr = e.projet;mob = pr && pr.mob;let x = pr && pr.exos.find(z => z.at === at);const sx = ((e.seances[S] || {}).exos || {})[at];if(x && sx && sx.next && sx.next.avant)x = sx.next.avant;   // v2.1 : le choix « prochaine fois » ne change pas la séance en cours
+    p = x ? {pct:x.pct, series:x.series, reps:x.reps, niv:x.niv} : null}
   else{mob = MOBILE_DU_JOUR[S];p = Object.assign({}, DEF_PARAM[mob])}
   if(!mob || !p)return null;
   if(a.type === 'variante' && p.niv == null)p.niv = e.niv[at] != null ? e.niv[at] : Math.min(1, (a.niveaux || []).length - 1);
@@ -185,13 +186,15 @@ function vocab(e){
   return [...new Set(perso.concat(B.motsClasse || [], MOTS_DEPART))].slice(0, 14);
 }
 const couleurNote = n => (ECHELLE.find(x => x[0] === n) || [])[3] || '#eee';
-function ressentiHTML(cle, r, avecSens){
+function ressentiHTML(cle, r, avecSens, ferme){
   r = r || {};
   const motChoisi = r.mot ? `<span class="chip-sel">· ${esc(r.mot)}</span>` : '';
   const sensChoisi = (avecSens && r.sens) ? `<span class="chip-sel">· ${esc(SENSATIONS.find(([k])=>k===r.sens)?.[1]||r.sens)}</span>` : '';
-  const ouvert = !r.mot; // ouvert par défaut si pas encore de mot
-  return `<div class="notes" role="group" aria-label="Note de 1 à 10">${ECHELLE.map(([n, t]) => `<button type="button" title="${esc(t)}" style="background:${couleurNote(n)}" class="${r.note === n ? 'ici' : ''}" data-note="${n}" data-cle="${cle}">${n}</button>`).join('')}</div>
-   ${r.note ? `<p class="small muted">${r.note} : ${esc(ECHELLE[r.note - 1][1])} · ${esc(ECHELLE[r.note - 1][2])}</p>` : ''}
+  const ouvert = !r.mot && !ferme; // ouvert par défaut si pas encore de mot (fermé sur la fiche d'analyse v2.1)
+  const v = r.note || 0;
+  return `<div class="rS ${v ? '' : 'vide'}"><div class="rS-bar"></div><input type="range" class="rSR" min="1" max="10" step="1" value="${v || 5}" data-cle="${cle}" aria-label="Note de ressenti de 1 à 10">
+   <div class="rS-t">${ECHELLE.map(([n]) => `<span class="${n === v ? 'on' : ''}">${n}</span>`).join('')}</div>
+   <div class="rS-l" style="${v ? `background:${couleurNote(v)}` : ''}">${v ? `<b>${v}</b><span>${esc(ECHELLE[v - 1][1])}<small>${esc(ECHELLE[v - 1][2])}</small></span>` : '<span>Fais glisser le rond sur ton ressenti</span>'}</div></div>
    <details class="volet-mots"${ouvert ? ' open' : ''}>
      <summary>Choisir un mot ${motChoisi}${sensChoisi}</summary>
      <div class="chips">${vocab(EL()).map(m => `<button type="button" class="${r.mot === m ? 'ici' : ''}" data-mot="${esc(m)}" data-cle="${cle}">${esc(m)}</button>`).join('')}<button type="button" data-autremot data-cle="${cle}">✏️ autre mot</button></div>
@@ -209,7 +212,7 @@ function objetCle(cle, creer){
 function apresRessenti(cle){
   const p = cle.split('.');
   if(p[0] === 'exos'){const ex = sea(EL(), SEANCE).exos[p[1]], pr = prevuDe(EL(), SEANCE, p[1]);
-    if(ex && ex.ressenti && ex.ressenti.note && pr)ex.coh = coherence(pr.mob, ex.ressenti.note, ex.ressenti.sens)}
+    if(ex && ex.ressenti && ex.ressenti.note && pr){ex.coh = coherence(pr.mob, ex.ressenti.note, ex.ressenti.sens);majOk(p[1])}}
   sauver();
 }
 
@@ -224,12 +227,13 @@ function vueSeance(){
   if(n === 1)h += carteCircuit() + carteSitue() + carteQRMots();
   if(n === 2 || n === 3)h += carteTest() + carteDefi() + carteQRMots();
   if(n >= SEANCE_MOBILE[0] && n <= SEANCE_MOBILE[1])h += carteMobile(MOBILE_DU_JOUR[SEANCE]) + listeExos(LISTES_DEFAUT[SEANCE]) ;
+  if(n >= 4 && n <= SEANCE_PROJET)h += carteAfl();   // v2.1 : l'évaluation AFL2 et AFL3 commence en S4
   if(n === SEANCE_MOBILE[1])h += carteComparer() + carteEchelle();
   if(n >= SEANCE_PROJET){
     const pr = e.projet;
     if(!pr || !pr.exos.length)h += `<section class="carte act"><h3>🎯 Construis d'abord ton projet</h3><p>Mobile, 3 groupes musculaires, 4 à 6 exercices.</p><button type="button" class="bt act" data-onglet="projet">Construire mon projet</button></section>`;
-    else h += carteMobile(pr.mob) + listeExos(pr.exos.map(x => x.at), true) + (n === SEANCE_PROJET ? carteAjustements() : carteAnalyse());
-    if(n === SEANCE_PROJET)h += carteAfl();
+    else h += carteMobile(pr.mob) + listeExos(pr.exos.map(x => x.at), true) + (sea(e, SEANCE).ajust && Object.keys(sea(e, SEANCE).ajust).length ? carteAjustements() : '') + carteAnalyse();
+
   }
   return h;
 }
@@ -398,23 +402,75 @@ function carteMobile(mob){return mob ? `<details class="carte"><summary>📋 Le 
 function listeExos(ids, projet){
   const e = EL(), S = SEANCE, s = sea(e, S);s.exos = s.exos || {};
   if(!projet){const l = B.listes[S];if(l)ids = l}
-  return `<h3 style="margin-top:16px">Les exercices · ${esc(prenom(e.nom))}</h3>${projet ? '' : `<p class="small muted">Liste du binôme ; <button type="button" class="lien" data-act="changerListe">changer un exercice</button>.</p>`}` + ids.map(at => carteExo(at)).join('');
+  return `<h3 style="margin-top:16px">Les exercices · ${esc(prenom(e.nom))}</h3>${projet ? '' : `<p class="small muted">Liste du binôme ; <button type="button" class="lien" data-act="changerListe">changer un exercice</button>.</p>`}` + ids.map(at => carteExo(at, at === (s.exCle && ids.includes(s.exCle) ? s.exCle : ids[0]))).join('');
 }
-function carteExo(at){
+const OUVERT = new Set();   // fiches terminées rouvertes à la main
+function carteExo(at, estCle){
   const e = EL(), a = atelier(at), p = prevuDe(e, SEANCE, at), ex = (sea(e, SEANCE).exos || {})[at] || {};
-  const r = ex.ressenti || {}, coh = ex.coh, aut = autre();
-  const etat = ex.real ? (coh && !coh.ok ? ' alerte' : ' fait') : '';
-  let h = `<div class="ex${etat}" id="ex-${at}"><header>${vignette(at)}<b style="flex:1">${esc(a.nom)}</b><span class="small muted">${esc(a.groupe)}</span></header>${prevuTexte(a, p)}`;
+  const r = ex.ressenti || {}, coh = ex.coh, aut = autre(), n = +SEANCE.slice(1);
+  const fini = n >= 4 && ex.real && ficheFinie(ex, p, aut, estCle);
+  const etat = fini ? ' fait' : ex.real && coh && !coh.ok && n < 4 ? ' alerte' : '';
+  let h = `<div class="ex${etat}" id="ex-${at}"><header>${vignette(at)}<b style="flex:1">${esc(a.nom)}</b><span class="small muted">${esc(a.groupe)}</span></header>`;
+  if(fini && !OUVERT.has(at))return h + resumeFiche(at, ex, p) + '</div>';
+  h += rappelPrec(at, ex) + prevuTexte(a, p);
   if(a.type === 'charge' && !(p && p.charge))h += `<p class="small">Pas encore de charge max sur cet atelier : <button type="button" class="lien" data-direct="${at}">saisie directe</button> (une série réussie entre 3 et 10 répétitions).</p>`;
   if(a.type === 'variante' && a.niveaux)h += `<div class="chips">${a.niveaux.map((t, i) => `<button type="button" class="${p && p.niv === i ? 'ici' : ''}" data-niv="${i}" data-at="${at}" title="${esc(t)}">Niv. ${i + 1}</button>`).join('')}</div>`;
+  if(n >= 4 && aut){const av = ex.avis || {};
+    if(ex.real && coachFini(ex, estCle) && !OUVERT.has('c-' + at))h += `<button type="button" class="resume coachR" data-ouvrir="c-${at}"><span>⏱</span><span><b>${esc(prenom(aut.nom))}</b> : point clé ${av.cle === '1' ? 'tenu ✓' : 'à revoir'}${av.propres != null ? ` · ${av.propres} propres` : ''}<br><small>« ${esc(av.conseil)} »</small></span><span class="small">✎</span></button>`;
+    else h += carteCoachM(at, ex, p, a, aut, estCle) + (ex.real && coachFini(ex, estCle) ? `<button type="button" class="lien" data-replier="c-${at}">Replier le coaching</button>` : '');}
   if(!ex.real)h += `<div class="rangee"><button type="button" class="bt ok" data-fait="${at}">✓ Fait comme prévu</button><button type="button" class="bt" data-modif="${at}">Fait autrement</button></div>`;
-  else h += `<p class="small">✓ Réalisé : ${ex.real.series} séries × ${ex.real.reps}${a.temps ? ' s' : ' rép.'}${ex.real.charge ? ' à ' + fmtKg(ex.real.charge) : ''}${ex.real.diff ? ' <b>(différent du prévu)</b>' : ''} <button type="button" class="lien" data-modif="${at}">modifier</button></p>
-    ${p && p.mob === 'puiss' ? `<div class="rangee"><button type="button" class="bt mini${ex.vit ? ' danger' : ''}" data-vit="${at}">⚡ ${ex.vit ? 'La vitesse a baissé (noté)' : 'La vitesse a baissé avant la fin'}</button></div>${ex.vit ? '<p class="retour non">Le partenaire a vu la vitesse baisser : la prochaine fois, une répétition de moins ou 5 % de charge en moins.</p>' : ''}` : ''}
-    <h4>Mon ressenti</h4>${ressentiHTML('exos.' + at + '.ressenti', r, true)}
-    ${coh ? `<p class="retour ${coh.stop ? 'stop' : coh.ok ? 'ok' : 'non'}">${coh.ok ? '✅ ' : coh.stop ? '⛔ ' : '⚠️ '}${esc(coh.msg)}</p>` : ''}
-    ${aut ? `<details${ex.avis ? ' open' : ''}><summary>👀 Avis du partenaire (${esc(prenom(aut.nom))})</summary><p class="small">Signes vus pendant la série :</p><div class="chips">${SIGNES.map(sg => `<button type="button" class="${ex.avis && ex.avis.signes.includes(sg) ? 'ici' : ''}" data-signe="${esc(sg)}" data-at="${at}">${esc(sg)}</button>`).join('')}</div>
-      <p class="small">Un conseil :</p><div class="chips">${CONSEILS.map(c => `<button type="button" class="${ex.avis && ex.avis.conseil === c ? 'ici' : ''}" data-conseil="${esc(c)}" data-at="${at}">${esc(c)}</button>`).join('')}</div></details>` : ''}`;
+  else{
+    h += `<p class="small">✓ Réalisé : ${ex.real.series} séries × ${ex.real.reps}${a.temps ? ' s' : ' rép.'}${ex.real.charge ? ' à ' + fmtKg(ex.real.charge) : ''}${ex.real.diff ? ' <b>(différent du prévu)</b>' : ''} <button type="button" class="lien" data-modif="${at}">modifier</button></p>`;
+    if(p && p.mob === 'puiss')h += `<div class="rangee"><button type="button" class="bt mini${ex.vit ? ' danger' : ''}" data-vit="${at}">⚡ ${ex.vit ? 'La vitesse a baissé (noté)' : 'La vitesse a baissé avant la fin'}</button></div>`;
+    if(n >= 4)h += carteMoi(at, ex, p);
+    else h += `<h4>Mon ressenti</h4>${ressentiHTML('exos.' + at + '.ressenti', r, true)}${coh ? `<p class="retour ${coh.stop ? 'stop' : coh.ok ? 'ok' : 'non'}">${esc(coh.msg)}</p>` : ''}`;
+    if(fini)h += `<button type="button" class="lien" data-replier="${at}">Replier la fiche</button>`;
+  }
   return h + '</div>';
+}
+function niveauCoach(){return NIV_COACH_M[SEANCE] || 1}
+function coachFini(ex, estCle){const av = ex.avis || {}, niv = niveauCoach();
+  return !!(av.cle && av.conseil && (!estCle || niv < 2 || av.propres != null) && (!estCle || niv < 3 || (av.obj && av.obj.k && av.obj.v !== '' && av.obj.v != null)))}
+function ficheFinie(ex, p, aut, estCle){
+  const nx = ex.next || {}, av = ex.avis || {}, niv = niveauCoach();
+  const moi = ex.ressenti && ex.ressenti.note && ex.rir && nx.c && (nx.ok !== false || (nx.pq || '').trim());
+  const coach = !aut || coachFini(ex, estCle);
+  return !!(moi && coach);
+}
+function resumeFiche(at, ex, p){
+  const nx = ex.next || {}, av = ex.avis || {}, rq = RIR_Q.find(q => q[0] === ex.rir) || [], nq = NEXT_Q.find(q => q[0] === nx.c) || [];
+  return `<button type="button" class="resume" data-ouvrir="${at}"><span class="rN" style="background:${couleurNote(ex.ressenti.note)}">${ex.ressenti.note}</span><span>réserve ${esc(rq[1] || '')} · <b>${esc(nq[1] || '')}</b>${av.conseil ? `<br><small>Coach : ${av.cle === '0' ? 'point clé à revoir · ' : ''}« ${esc(av.conseil)} »</small>` : ''}</span><span class="small">✎</span></button>`;
+}
+/* séance précédente sur le même atelier : conseil et objectif du coach */
+function precedent(at){const n = +SEANCE.slice(1), e = EL();for(let k = n - 1;k >= 4;k--){const x = ((e.seances['S' + k] || {}).exos || {})[at];if(x && x.avis && (x.avis.conseil || (x.avis.obj && x.avis.obj.k)))return {S:'S' + k, x}}return null}
+function rappelPrec(at, ex){
+  const pr = precedent(at);if(!pr)return '';const av = pr.x.avis, qui = av.par ? prenom(av.par) : 'Ton coach', o = av.obj && av.obj.k && av.obj.v !== '' && av.obj.v != null ? av.obj : null, lib = o ? (OBJ_M.find(z => z[0] === o.k) || [])[1] : '';
+  const tenu = o && ex.real ? objTenuM(o, ex.real) : null;
+  return `<div class="rappel">${av.conseil ? `<p class="small"><b>${esc(qui)}</b> t'avait conseillé (${pr.S}) : « ${esc(av.conseil)} »</p>` : ''}${o ? `<p class="small">🎯 Objectif : <b>${esc(lib)} ${esc(String(o.v))}</b>${tenu == null ? '' : tenu ? ' · <b class="okc">tenu ✓</b>' : ' · pas tenu'}</p>` : ''}
+   ${av.conseil && ex.real ? `<div class="rangee"><span class="small">Ce conseil t'a aidé ?</span><span class="chips">${[['1','oui'],['0','non']].map(([v, t]) => `<button type="button" class="${ex.aide === v ? 'ici' : ''}" data-aide="${at}" data-v="${v}">${t}</button>`).join('')}</span></div>` : ''}</div>`;
+}
+function carteMoi(at, ex, p){
+  const e = EL(), r = ex.ressenti || {}, nx = ex.next || {}, coh = ex.coh, sens = p ? sensSuite(p.mob, ex) : null;
+  const prop = p && sens != null ? ajuster(p.mob, p, sens) : null, ok = nx.c ? choixCoherent(sens, nx.c) : null;
+  return `<div class="bcm moi"><h4><span>✎</span> Fin de l'exercice · ${esc(prenom(e.nom))} écrit</h4>
+   ${ressentiHTML('exos.' + at + '.ressenti', r, true, true)}${coh && coh.stop ? `<p class="retour stop">⛔ ${esc(coh.msg)}</p>` : ''}
+   <p class="bti">Combien aurais-tu pu en faire encore, propres ?</p><div class="seg">${RIR_Q.map(([k, t]) => `<button type="button" class="${ex.rir === k ? 'ici' : ''}" data-rir="${at}" data-v="${k}">${t}</button>`).join('')}</div>
+   <p class="bti">La prochaine fois, je…</p><div class="choix2">${NEXT_Q.map(([k, t]) => `<button type="button" class="${nx.c === k ? 'ici' : ''}" data-next="${at}" data-v="${k}">${esc(t)}</button>`).join('')}</div>
+   ${nx.c && prop ? `<p class="retour ${ok === false ? 'non' : 'ok'}">${ex.rir && p ? esc(msgReserve(p.mob, ex.rir)) + ' ' : ''}L'appli proposait : <b>${esc(prop.txt.replace(/\.$/, ''))}</b>. ${ok === false ? 'Ton choix est différent : dis pourquoi.' : 'Ton choix va dans le même sens ✓'}</p>
+     <input type="text" class="pq" maxlength="160" data-pq="${at}" value="${esc(nx.pq || '')}" placeholder="${ok === false ? 'Pourquoi ? ex. le dos s\'arrondissait à la fin' : 'Pourquoi (facultatif)'}">` : ''}</div>`;
+}
+function carteCoachM(at, ex, p, a, aut, estCle){
+  const e = EL(), av = ex.avis || {}, niv = niveauCoach(), P_ = esc(prenom(e.nom)), nS = (av.signes || []).length;
+  const pc = POINT_CLE[at] || (a.crit || [])[0] || '', objL = OBJ_M.filter(([k]) => k !== 'charge' || a.type === 'charge'), pr = p ? p.reps : 10;
+  const monte = ex.next && ['serie', 'reps', 'chargeP'].includes(ex.next.c), defaut = av.cle === '0' || nS;
+  return `<div class="bcm coach"><h4><span>⏱</span> Pendant les séries · ${esc(prenom(aut.nom))} coache ${P_}</h4><p class="small muted">Niveau ${niv} : ${['', 'je constate', 'je compte', 'je fixe un objectif'][niv]}${niv > 1 ? estCle ? ' · ⭐ exercice clé' : ` · <button type="button" class="lien" data-excle="${at}">⭐ en faire l'exercice clé</button>` : ''}</p>
+   <p class="bti">Point clé : ${esc(pc)}</p><div class="seg deux">${[['1','✓ Tenu'],['0','À revoir']].map(([v, t]) => `<button type="button" class="${av.cle === v ? 'ici' + (v === '0' ? ' rouge' : '') : ''}" data-clevu="${at}" data-v="${v}">${t}</button>`).join('')}</div>
+   <details class="sig"${nS ? ' open' : ''}><summary>▸ Signes de fatigue${nS ? ` <b>(${nS})</b>` : ''}</summary><div class="chips">${SIGNES.map(sg => `<button type="button" class="${(av.signes || []).includes(sg) ? 'ici' : ''}" data-signe="${esc(sg)}" data-at="${at}">${esc(sg)}</button>`).join('')}</div></details>
+   ${niv >= 2 && estCle ? `<p class="bti">Répétitions propres, dernière série</p><div class="pas"><button type="button" data-propres="${at}" data-d="-1" aria-label="moins">−</button><b>${av.propres != null ? av.propres : '–'}</b><span>/ ${pr}</span><button type="button" data-propres="${at}" data-d="1" aria-label="plus">+</button></div>` : ''}
+   <p class="bti">Ton conseil</p><div class="chips">${conseilsPour(ex).map(c => `<button type="button" class="${av.conseil === c ? 'ici' : ''}" data-conseil="${esc(c)}" data-at="${at}">${esc(c)}</button>`).join('')}</div>
+   ${niv >= 3 && estCle ? `<p class="bti">Objectif pour ${P_} la prochaine fois</p><div class="seg">${objL.map(([k, t]) => `<button type="button" class="${av.obj && av.obj.k === k ? 'ici' : ''}" data-objk="${at}" data-v="${k}">${t.replace(' (kg)', '')}</button>`).join('')}</div>
+     ${av.obj && av.obj.k ? `<input type="number" inputmode="decimal" data-objv="${at}" value="${esc(av.obj.v != null ? String(av.obj.v) : '')}" placeholder="${(OBJ_M.find(z => z[0] === av.obj.k) || [])[1]}" style="max-width:160px;margin-top:6px">` : ''}` : ''}
+   ${defaut && monte ? `<p class="retour non">⚠️ ${esc(prenom(aut.nom))} a vu un défaut, et ${P_} veut augmenter : corrige d'abord la posture.</p>` : ''}</div>`;
 }
 function modifierExo(at){
   const e = EL(), a = atelier(at), p = prevuDe(e, SEANCE, at) || {}, ex = (sea(e, SEANCE).exos || {})[at] || {}, re = ex.real || {};
@@ -454,6 +510,25 @@ function carteEchelle(){
    <p class="small"><button type="button" class="lien" data-autremot data-cle="echelle">✏️ ajouter un mot à ma liste</button></p></section>`;
 }
 /* ---------- S7-S9 : ajustements, analyse, AFL ---------- */
+/* v2.1 : « La prochaine fois, je… ». En projet (S7-S9), le choix modifie les paramètres du projet (annulable). */
+function exoCourant(at){const s = sea(EL(), SEANCE);s.exos = s.exos || {};return s.exos[at] = s.exos[at] || {}}
+function avisDe(at){const x = exoCourant(at);x.avis = x.avis || {par:autre() ? autre().nom : '', signes:[], conseil:''};if(autre())x.avis.par = autre().nom;return x.avis}
+function majOk(at){const x = exoCourant(at), p = prevuDe(EL(), SEANCE, at);if(x.next && x.next.c)x.next.ok = choixCoherent(p ? sensSuite(p.mob, x) : null, x.next.c)}
+function choisirSuite(at, v){
+  const e = EL(), s = sea(e, SEANCE);s.exos = s.exos || {};const x = s.exos[at] = s.exos[at] || {};
+  const nx = x.next = x.next || {}, pr = e.projet, px = +SEANCE.slice(1) >= SEANCE_PROJET && pr && pr.exos ? pr.exos.find(z => z.at === at) : null;
+  if(px && nx.avant){Object.assign(px, nx.avant);delete nx.avant;const i = e.ajust.map(z => z.S + z.at).lastIndexOf(SEANCE + at);if(i >= 0)e.ajust.splice(i, 1)}
+  nx.c = nx.c === v ? '' : v;majOk(at);
+  if(px && nx.c){
+    const m = MOBILES[pr.mob] || {}, b = (k, d) => Math.min(m[k][1], Math.max(m[k][0], px[k] + d));nx.avant = Object.assign({}, px);
+    if(nx.c === 'serie')px.series = b('series', 1);
+    if(nx.c === 'reps')px.reps = b('reps', 2);
+    if(nx.c === 'chargeP')px.pct = b('pct', 5);
+    if(nx.c === 'chargeM')px.pct = b('pct', -5);
+    e.ajust = e.ajust || [];e.ajust.push({S:SEANCE, at, txt:(NEXT_Q.find(q => q[0] === nx.c) || [])[1], pourquoi:nx.pq || '', date:jour()});
+  }
+  sauver();rendre();
+}
 function carteAjustements(){
   const e = EL(), pr = e.projet, s = sea(e, SEANCE), ex = s.exos || {};
   const l = pr.exos.filter(x => ex[x.at] && ex[x.at].coh);
@@ -470,10 +545,11 @@ function carteAnalyse(){
   return `<section class="carte act"><h3>Mon analyse</h3><p class="small">En 2 phrases : ce qui était conforme à ton mobile, ce que tu changerais.</p><textarea data-texte="analyse">${esc(s.analyse || '')}</textarea></section>`;
 }
 function carteAfl(){
-  const e = EL(), verrou = e.seances.S8 && Object.keys(e.seances.S8).length;
-  return `<section class="carte"><h3>Mon évaluation AFL2 et AFL3</h3><p class="small">Choix à faire en S7 ; ${verrou ? '<b>verrouillé depuis la S8</b>' : 'il se verrouille dès que tu commences la S7'}.</p>
-   <h4>Répartition des 8 points</h4><div class="chips">${EVAL.repartitions.map(([k, t]) => `<button type="button" class="${e.afl.rep === k ? 'ici' : ''}" data-afl="${k}"${verrou ? ' disabled' : ''}>${esc(t)}</button>`).join('')}</div>
-   <h4>Mon rôle évalué (AFL3)</h4>${EVAL.roles.map(([k, t, d]) => `<button type="button" class="bt pleine${e.afl.role === k ? ' noir' : ''}" style="margin:4px 0;justify-content:flex-start;text-align:left;height:auto;padding:8px 14px;flex-direction:column;align-items:flex-start" data-role="${k}"${verrou ? ' disabled' : ''}><span>${esc(t)}</span><span class="small" style="font-weight:400">${esc(d)}</span></button>`).join('')}</section>`;
+  const e = EL(), verrou = e.seances.S8 && Object.keys(e.seances.S8).length, rep = EVAL.repartitions.find(r => r[0] === e.afl.rep);
+  if(rep && !OUVERT.has('afl'))return `<section class="carte"><button type="button" class="resume" data-ouvrir="afl"><span>🎯</span><span><b>Mon évaluation :</b> ${esc(rep[1])}<br><small>AFL2 : mes analyses · AFL3 : mon coaching (S4 à S7)</small></span><span class="small">✎</span></button></section>`;
+  return `<section class="carte act"><h3>Mon évaluation AFL2 et AFL3</h3><p class="small">Elle commence en S4 : tes analyses de fin d'exercice comptent en AFL2, ton coaching du partenaire en AFL3. Choisis ta répartition des 8 points ; ${verrou ? '<b>verrouillée depuis la S8</b>' : 'elle se verrouille quand tu commences la S8'}.</p>
+   <div class="choix2">${EVAL.repartitions.map(([k, t]) => `<button type="button" class="${e.afl.rep === k ? 'ici' : ''}" data-afl="${k}"${verrou ? ' disabled' : ''}>${esc(t)}</button>`).join('')}</div>
+   <p class="small muted">Rôle AFL3 : ${esc(EVAL.roles[0][1])} pour tous. ${esc(EVAL.roles[0][2])}</p>${rep ? `<button type="button" class="lien" data-replier="afl">Replier</button>` : ''}</section>`;
 }
 
 /* ================== Vue : charges ================== */
@@ -581,10 +657,15 @@ function binomeDemo(){
   e1.seances.S5 = {forme:3, exos:{dch:{real:{series:4, reps:10, charge:10}, ressenti:{note:8, mot:'ça gonfle', sens:'brulure'}}, squath:{real:{series:4, reps:10, charge:11}, ressenti:{note:8, mot:'ça brûle', sens:'brulure'}}}};
   e1.seances.S6 = {forme:4, exos:{hip:{real:{series:4, reps:5, charge:14}, ressenti:{note:6, mot:'compact', sens:'tension'}}}};
   [['S4', 'tonif'], ['S5', 'volume'], ['S6', 'puiss']].forEach(([S, m]) => Object.values(e1.seances[S].exos).forEach(x => x.coh = coherence(m, x.ressenti.note, x.ressenti.sens)));
+  const H = 'Hugo BERNARD';   // v2.1 : analyses et coaching de démonstration
+  Object.assign(e1.seances.S4.exos.dch, {rir:'34', next:{c:'garde', ok:true}, avis:{par:H, cle:'0', signes:[], conseil:'Ralentis la descente'}});
+  Object.assign(e1.seances.S4.exos.rowh, {rir:'5', next:{c:'reps', ok:true}, avis:{par:H, cle:'1', signes:[], conseil:'Tu peux monter la charge'}});
+  Object.assign(e1.seances.S5.exos.dch, {aide:'1', rir:'0', next:{c:'chargeP', ok:false, pq:''}, avis:{par:H, cle:'0', signes:["Dos qui s'arrondit ou se creuse"], conseil:''}});
+  Object.assign(e1.seances.S6.exos.hip, {rir:'34', next:{c:'garde', ok:true}, avis:{par:H, cle:'1', signes:[], propres:5, conseil:'Plus vite à la montée', obj:{k:'reps', v:12}}});
+  e1.afl = {rep:'4/4', role:'coach'};
   e1.choix = {mob:'volume', pourquoi:"C'est en Volume que j'ai senti mes muscles gonfler, et c'est ce que je cherche."};
   e1.echelle = {3:'léger', 5:'chaud', 6:'ça picote', 7:'ça brûle', 8:'ça gonfle', 10:'je bloque'};
   e1.projet = {mob:'volume', exos:[{at:'dch', series:4, reps:10, pct:70}, {at:'rowh', series:4, reps:10, pct:70}, {at:'squath', series:4, reps:10, pct:70}, {at:'hip', series:4, reps:10, pct:70}]};
-  e1.afl = {rep:'4/4', role:'coach'};
   return {id:'demo0000', v:1, app:'musculation-eleves', classe:'DÉMO', cree:jour(), equipe:'B', listes:{}, motsClasse:['ça tape', 'lourd'], envois:[], e:[e1, e2]};
 }
 
@@ -605,7 +686,16 @@ document.addEventListener('click', async ev => {
     if(d.cle !== 'echelle'){const o = objetCle(d.cle, true);o.mot = m;apresRessenti(d.cle)}else sauver();T ? rendreTest() : rendre();return}
   if(d.sens && d.cle){const o = objetCle(d.cle, true);o.sens = d.sens;apresRessenti(d.cle);rendre();return}
   if(d.forme){sea(EL(), SEANCE).forme = +d.forme;sauver();rendre();return}
-  if(d.vit){const s = sea(EL(), SEANCE);s.exos = s.exos || {};const x = s.exos[d.vit] = s.exos[d.vit] || {};x.vit = !x.vit;sauver();rendre();return}
+  if(d.next && d.v){choisirSuite(d.next, d.v);return}
+  if(d.rir && d.v){const x = exoCourant(d.rir);x.rir = x.rir === d.v ? '' : d.v;majOk(d.rir);sauver();rendre();return}
+  if(d.aide && d.v){const x = exoCourant(d.aide);x.aide = x.aide === d.v ? '' : d.v;sauver();rendre();return}
+  if(d.clevu){const v = avisDe(d.clevu);v.cle = v.cle === d.v ? '' : d.v;sauver();rendre();return}
+  if(d.propres){const v = avisDe(d.propres), p = prevuDe(EL(), SEANCE, d.propres), mx = p ? p.reps : 30;v.propres = Math.max(0, Math.min(mx, (v.propres != null ? v.propres : mx) + (v.propres != null ? +d.d : 0)));sauver();rendre();return}
+  if(d.objk){const v = avisDe(d.objk);v.obj = v.obj && v.obj.k === d.v ? null : {k:d.v, v:''};sauver();rendre();return}
+  if(d.excle){sea(EL(), SEANCE).exCle = d.excle;sauver();rendre();return}
+  if(d.ouvrir){OUVERT.add(d.ouvrir);rendre();return}
+  if(d.replier){OUVERT.delete(d.replier);rendre();const z = $('ex-' + d.replier);if(z)z.scrollIntoView({block:'nearest'});return}
+  if(d.vit){const s = sea(EL(), SEANCE);s.exos = s.exos || {};const x = s.exos[d.vit] = s.exos[d.vit] || {};x.vit = !x.vit;majOk(d.vit);sauver();rendre();return}
   if(d.circuit){const s = sea(EL(), 'S1');s.circuit = s.circuit || {};s.circuit[d.circuit] = !s.circuit[d.circuit];sauver();rendre();return}
   if(d.situe){const e = EL();e.situe = e.situe || {};if(d.multi){const l = e.situe[d.situe] = e.situe[d.situe] || [];const i = l.indexOf(d.v);i < 0 ? l.push(d.v) : l.splice(i, 1)}else e.situe[d.situe] = d.v;sauver();rendre();return}
   if(d.fiche){ouvrirFiche(d.fiche);return}
@@ -617,8 +707,8 @@ document.addEventListener('click', async ev => {
   if(d.fait){const p = prevuDe(EL(), SEANCE, d.fait), s = sea(EL(), SEANCE);s.exos = s.exos || {};const ex = s.exos[d.fait] = s.exos[d.fait] || {};
     ex.real = {series:p ? p.series : 3, reps:p ? p.reps : 10, charge:p && p.charge ? p.charge.charge : null, niv:p ? p.niv : null, diff:false};sauver();rendre();return}
   if(d.modif){modifierExo(d.modif);return}
-  if(d.signe){const ex = sea(EL(), SEANCE).exos[d.at];ex.avis = ex.avis || {par:autre() ? autre().nom : '', signes:[], conseil:''};const i = ex.avis.signes.indexOf(d.signe);i < 0 ? ex.avis.signes.push(d.signe) : ex.avis.signes.splice(i, 1);sauver();rendre();return}
-  if(d.conseil){const ex = sea(EL(), SEANCE).exos[d.at];ex.avis = ex.avis || {par:autre() ? autre().nom : '', signes:[], conseil:''};ex.avis.conseil = ex.avis.conseil === d.conseil ? '' : d.conseil;sauver();rendre();return}
+  if(d.signe){const v = avisDe(d.at);v.signes = v.signes || [];const i = v.signes.indexOf(d.signe);i < 0 ? v.signes.push(d.signe) : v.signes.splice(i, 1);sauver();rendre();return}
+  if(d.conseil){const v = avisDe(d.at);v.conseil = v.conseil === d.conseil ? '' : d.conseil;sauver();rendre();return}
   if(d.choix && !d.aj){const e = EL();e.choix = Object.assign(e.choix || {}, {mob:d.choix, date:jour()});sauver();rendre();return}
   if(d.aj){const e = EL(), pr = e.projet, x = pr.exos.find(z => z.at === d.aj), s = sea(e, SEANCE), coh = s.exos[d.aj].coh, prop = ajuster(pr.mob, x, coh.sens), pq = ($('pq-' + d.aj) || {}).value || '';
     if(!pq.trim() && !confirm('Sans justification, cet ajustement ne compte pas dans ton analyse. Continuer ?'))return;
@@ -627,7 +717,7 @@ document.addEventListener('click', async ev => {
     e.ajust.push({S:SEANCE, at:d.aj, txt:d.choix === 'ok' ? prop.txt : 'gardé tel quel', pourquoi:pq.trim(), date:jour()});sauver();rendre();return}
   if(d.annulerAj){const e = EL(), s = sea(e, SEANCE), a = s.ajust[d.annulerAj];if(a && a.avant){const x = e.projet.exos.find(z => z.at === d.annulerAj);Object.assign(x, a.avant)}delete s.ajust[d.annulerAj];
     const i = e.ajust.map(z => z.S + z.at).lastIndexOf(SEANCE + d.annulerAj);if(i >= 0)e.ajust.splice(i, 1);sauver();rendre();return}
-  if(d.afl){EL().afl.rep = d.afl;sauver();rendre();return}
+  if(d.afl){EL().afl.rep = d.afl;EL().afl.role = 'coach';OUVERT.delete('afl');sauver();rendre();return}
   if(d.role){EL().afl.role = d.role;sauver();rendre();return}
   if(d.calc){calcAtelier(d.calc);return}
   if(d.nouveauProjet){const m = d.nouveauProjet, dp = DEF_PARAM[m];EL().projet = {mob:m, exos:[], cree:jour()};sauver();rendre();return}
@@ -679,10 +769,14 @@ document.addEventListener('change', ev => {
   if(d.texte === 'choix'){const e = EL();e.choix = Object.assign(e.choix || {}, {pourquoi:t.value.trim()});sauver();return}
   if(d.texte === 'analyse'){sea(EL(), SEANCE).analyse = t.value.trim();sauver();return}
   if(d.echelle){EL().echelle[d.echelle] = t.value;sauver();return}
+  if(d.pq){const x = sea(EL(), SEANCE).exos[d.pq];if(x){x.next = Object.assign(x.next || {}, {pq:t.value.trim()});sauver()}return}
+  if(d.objv){const x = sea(EL(), SEANCE).exos[d.objv];if(x && x.avis && x.avis.obj){x.avis.obj.v = num(t.value);sauver()}return}
+  if(t.classList.contains('rSR') && d.cle){const o = objetCle(d.cle, true);o.note = +t.value;apresRessenti(d.cle);T ? rendreTest() : rendre();return}
   if(t.id === 'ajEx' && t.value){const pr = EL().projet, a = atelier(t.value), dp = DEF_PARAM[pr.mob];pr.exos.push({at:t.value, series:dp.series, reps:dp.reps, pct:dp.pct, niv:a.niveaux ? Math.min(1, a.niveaux.length - 1) : null});sauver();rendre();return}
   if(t.id === 'lSup')majCalcLibre();
 });
-document.addEventListener('input', ev => {if(['lCm', 'lCh', 'lRp'].includes(ev.target.id))majCalcLibre()});
+document.addEventListener('input', ev => {if(['lCm', 'lCh', 'lRp'].includes(ev.target.id))majCalcLibre();
+  if(ev.target.classList.contains('rSR')){const v = +ev.target.value, w = ev.target.closest('.rS'), l = w.querySelector('.rS-l');w.classList.remove('vide');l.style.background = couleurNote(v);l.innerHTML = `<b>${v}</b><span>${esc(ECHELLE[v - 1][1])}<small>${esc(ECHELLE[v - 1][2])}</small></span>`;w.querySelectorAll('.rS-t span').forEach((x, i) => x.classList.toggle('on', i + 1 === v))}});
 document.addEventListener('keydown', ev => {if(ev.key === 'Enter' && ev.target.id === 'oCode'){const b = document.querySelector('[data-act="valCode"]');if(b)b.click()}});
 $('btMob').onclick = panneauMobiles;
 window.addEventListener('eps-avant-maj', () => sauver());

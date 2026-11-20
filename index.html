@@ -83,6 +83,45 @@ input.code{font:800 34px/1 var(--d);letter-spacing:.4em;text-align:center}
 .notes{display:grid;grid-template-columns:repeat(10,1fr);gap:4px;margin:6px 0}
 .notes button{min-height:46px;border-radius:10px;border:2px solid transparent;font:800 18px var(--d);color:#1c2128}
 .notes button.ici{border-color:var(--encre);transform:scale(1.08)}
+/* v2.1 : curseur de ressenti (échelle 1-10) et fiche d'analyse en deux cartes */
+.rS{position:relative;padding:0 6px;margin:22px 0 8px}
+.rS-bar{height:22px;border-radius:12px;background:linear-gradient(90deg,#e2e8f0 0%,#bfdbfe 22%,#86efac 40%,#fde68a 55%,#fdba74 66%,#fb923c 77%,#f87171 88%,#dc2626 100%)}
+.rS input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:56px;background:transparent;position:absolute;left:0;top:-17px;margin:0;cursor:pointer;touch-action:pan-y}
+.rS input[type=range]::-webkit-slider-runnable-track{background:transparent;height:56px}
+.rS input[type=range]::-moz-range-track{background:transparent}
+.rS input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:44px;height:44px;margin-top:6px;border-radius:50%;background:#fff;border:5px solid #1c2128;box-shadow:0 2px 6px rgba(0,0,0,.3)}
+.rS input[type=range]::-moz-range-thumb{width:34px;height:34px;border-radius:50%;background:#fff;border:5px solid #1c2128}
+.rS.vide input::-webkit-slider-thumb{opacity:0}.rS.vide input::-moz-range-thumb{opacity:0}
+.rS-t{display:flex;justify-content:space-between;margin-top:8px;padding:0 6px}
+.rS-t span{width:26px;text-align:center;font-weight:800;font-size:15px;color:#64748b}.rS-t span.on{color:#1c2128;font-size:19px}
+.rS-l{display:flex;align-items:center;gap:12px;margin-top:12px;padding:10px 12px;border-radius:12px;font-weight:800;background:#e5e7eb;color:#1c2128}
+.rS.vide .rS-l{color:#64748b}
+.rS-l b{font-size:34px;line-height:1;min-width:44px;text-align:center}.rS-l small{display:block;font-weight:600;opacity:.9;font-size:14px}
+.bcm{border-radius:14px;padding:10px 12px;margin:10px 0;border:2px solid var(--trait)}
+.bcm h4{margin:0 0 4px;display:flex;gap:8px;align-items:center}
+.bcm.moi{background:#f0f9ff;border-color:#7dd3fc}.bcm.coach{background:#fff7ed;border-color:#fdba74}
+.bti{font-weight:800;margin:12px 0 4px}
+.choix{display:flex;flex-direction:column;gap:6px}
+.choix button{min-height:44px;text-align:left;padding:8px 12px;border-radius:12px;border:1.5px solid var(--trait);background:#fff;font-size:16px}
+.choix button.ici{background:var(--encre);color:#fff;border-color:var(--encre)}
+.vu{display:flex;align-items:center;justify-content:space-between;gap:8px;border-bottom:1px dashed var(--trait);padding:2px 0}
+.vu>span:first-child{font-size:15px;flex:1}.vu .chips{margin:2px 0;flex-wrap:nowrap}
+.chips button.ici.rouge{background:var(--alerte);border-color:var(--alerte)}
+.rappel{background:#fefce8;border:1.5px solid #fde047;border-radius:12px;padding:6px 10px;margin:8px 0}
+.rappel p{margin:4px 0}.okc{color:#15803d}
+input.pq{width:100%;margin-top:6px}
+.seg{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:4px 0}.seg.deux{grid-template-columns:1fr 1fr}
+.seg button,.choix2 button{min-height:48px;border-radius:12px;border:1.5px solid var(--trait);background:#fff;font-size:16px;font-weight:700;padding:4px 6px}
+.seg button.ici,.choix2 button.ici{background:var(--encre);color:#fff;border-color:var(--encre)}
+.seg button.ici.rouge{background:var(--alerte);border-color:var(--alerte)}
+.choix2{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.pas{display:flex;align-items:center;gap:12px;margin:4px 0}.pas button{width:52px;height:48px;border-radius:12px;border:1.5px solid var(--trait);background:#fff;font:800 24px var(--d)}
+.pas b{font:800 30px var(--d);min-width:40px;text-align:center}
+details.sig{margin:8px 0}details.sig summary{min-height:44px;display:flex;align-items:center;font-weight:700;cursor:pointer}
+.resume{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:none;border:0;padding:6px 0;font-size:16px;color:inherit;min-height:52px}
+.resume small{color:var(--repere,#555)}.resume>span:last-child{margin-left:auto}
+.resume.coachR{background:#fff7ed;border-radius:12px;padding:6px 10px;margin:8px 0}details.sig summary::-webkit-details-marker{display:none}details.sig[open] summary{color:var(--alerte)}
+.rN{font:800 22px/44px var(--d);min-width:44px;height:44px;border-radius:12px;text-align:center;color:#1c2128}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
 .chips button{min-height:44px;padding:0 12px;border-radius:22px;border:1.5px solid var(--trait);background:var(--craie);font-size:16px}
 .chips button.ici{background:var(--encre);color:#fff;border-color:var(--encre)}
