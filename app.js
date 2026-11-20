@@ -156,6 +156,20 @@ function panneauMobiles(){
 
 /* ================== Charges : calculs ================== */
 function cmDe(e, at){const r = e.rm[at];return r && r.cm ? r.cm : null}
+/* v2.2 : charge max avec historique (rien n'est perdu), mise à jour bloquée pendant l'évaluation (S8-S9) */
+function majRM(e, at, rec){const old = e.rm[at];rec.hist = ((old && old.hist) || []).concat(old ? [{cm:old.cm, date:old.date, mode:old.mode}] : []);e.rm[at] = rec}
+const rmVerrou = e => !!(e.seances.S8 && Object.keys(e.seances.S8).length);
+const MODE_RM = {test:'test', direct:'saisie directe', seance:'mise à jour en séance'};
+/* estimation d'après la série réalisée + les répétitions en réserve (Brzycki prolongé à 15 répétitions au total, prudent : borne basse de la réserve).
+   Seulement en Volume : en Tonification (15-20 rép.) la formule ne vaut plus, en Puissance la réserve ne dit rien. */
+function suggestionRM(e, at, ex, p){
+  if(!ex.real || !p || p.mob !== 'volume' || rmVerrou(e) || ex.rmNon || ex.rmMaj)return null;
+  const a = atelier(at), cm = cmDe(e, at), r = ex.real, plus = {12:1, 34:3, 5:5}[ex.rir];
+  if(a.type !== 'charge' || !cm || !plus || !(r.charge > 0) || r.reps < p.reps)return null;
+  const tot = r.reps + plus;if(tot > 15)return null;
+  const est = Math.round(r.charge * 36 / (37 - tot) * 2) / 2;
+  return est >= cm * 1.05 ? {cm, est, charge:r.charge, reps:r.reps} : null;
+}
 function prevuDe(e, S, at){
   const a = atelier(at);let mob, p;
   if(+S.slice(1) >= SEANCE_PROJET){const pr = e.projet;mob = pr && pr.mob;let x = pr && pr.exos.find(z => z.at === at);const sx = ((e.seances[S] || {}).exos || {})[at];if(x && sx && sx.next && sx.next.avant)x = sx.next.avant;   // v2.1 : le choix « prochaine fois » ne change pas la séance en cours
@@ -352,7 +366,7 @@ function finSerie(){
 setInterval(() => {const c = $('tChrono');if(!c || !T)return;const r = Math.max(0, Math.round((T.recupFin - Date.now()) / 1000));c.textContent = Math.floor(r / 60) + ':' + String(r % 60).padStart(2, '0');if(r === 0)c.style.color = 'var(--ok)'}, 500);
 function validerTest(){
   const e = B.e[T.el], best = meilleure(T.series);if(!best)return;
-  e.rm[T.at] = {cm:best.cm, charge:best.charge, reps:best.valides, date:jour(), mode:'test'};
+  majRM(e, T.at, {cm:best.cm, charge:best.charge, reps:best.valides, date:jour(), mode:'test'});
   const t = e.tests[T.at] = e.tests[T.at] || {ressentis:{}};t.series = T.series;t.date = jour();
   sauver();T = null;rendreTest();rendre();toast('Charge max enregistrée');
 }
@@ -455,6 +469,7 @@ function carteMoi(at, ex, p){
   return `<div class="bcm moi"><h4><span>✎</span> Fin de l'exercice · ${esc(prenom(e.nom))} écrit</h4>
    ${ressentiHTML('exos.' + at + '.ressenti', r, true, true)}${coh && coh.stop ? `<p class="retour stop">⛔ ${esc(coh.msg)}</p>` : ''}
    <p class="bti">Combien aurais-tu pu en faire encore, propres ?</p><div class="seg">${RIR_Q.map(([k, t]) => `<button type="button" class="${ex.rir === k ? 'ici' : ''}" data-rir="${at}" data-v="${k}">${t}</button>`).join('')}</div>
+   ${(() => {const sg = suggestionRM(e, at, ex, p);return sg ? `<div class="rappel"><p class="small">📈 <b>Ta charge max semble avoir monté</b> : ${sg.reps} rép. à ${fmtKg(sg.charge)} avec de la réserve, soit environ <b>${fmtKg(sg.cm)} → ${fmtKg(sg.est)}</b>. Les charges prévues monteront.</p><div class="rangee"><button type="button" class="bt mini ok" data-majrm="${at}">Mettre à jour</button><button type="button" class="bt mini" data-nonrm="${at}">Non, pas sûr</button></div></div>` : ex.rmMaj ? `<p class="small okc">📈 Charge max mise à jour : ${fmtKg(ex.rmMaj)}.</p>` : ''})()}
    <p class="bti">La prochaine fois, je…</p><div class="choix2">${NEXT_Q.map(([k, t]) => `<button type="button" class="${nx.c === k ? 'ici' : ''}" data-next="${at}" data-v="${k}">${esc(t)}</button>`).join('')}</div>
    ${nx.c && prop ? `<p class="retour ${ok === false ? 'non' : 'ok'}">${ex.rir && p ? esc(msgReserve(p.mob, ex.rir)) + ' ' : ''}L'appli proposait : <b>${esc(prop.txt.replace(/\.$/, ''))}</b>. ${ok === false ? 'Ton choix est différent : dis pourquoi.' : 'Ton choix va dans le même sens ✓'}</p>
      <input type="text" class="pq" maxlength="160" data-pq="${at}" value="${esc(nx.pq || '')}" placeholder="${ok === false ? 'Pourquoi ? ex. le dos s\'arrondissait à la fin' : 'Pourquoi (facultatif)'}">` : ''}</div>`;
@@ -556,7 +571,7 @@ function carteAfl(){
 function vueCharges(){
   const e = EL(), ats = ATELIERS.filter(a => a.menu), nb = ats.filter(a => e.rm[a.id]).length;
   return `<h2>Mes charges · ${esc(prenom(e.nom))}</h2><p class="retour ${nb >= OBJ_TESTS[0] ? 'ok' : 'non'}"><b>${nb} / ${ats.length}</b> charges max · objectif ${OBJ_TESTS[0]} à ${OBJ_TESTS[1]} à la fin de la S3. Un atelier sans charge max ne peut pas entrer dans ton projet.</p>
-   <section class="carte"><table class="tb"><tr><th>Atelier</th><th>Charge max</th><th></th></tr>${ats.map(a => {const r = e.rm[a.id];return `<tr><td>${esc(a.nom)} <span class="small muted">${esc(a.groupe)}</span></td><td>${r ? `<b>${fmtKg(r.cm)}</b><br><span class="small muted">${r.mode === 'direct' ? 'saisie directe' : 'test'} · ${esc(r.date)}</span>` : '—'}</td><td><button type="button" class="bt mini" data-calc="${a.id}"${r ? '' : ' disabled'}>%</button> <button type="button" class="bt mini" data-direct="${a.id}">✏️</button></td></tr>`}).join('')}</table></section>
+   <section class="carte"><p class="small">${rmVerrou(e) ? '🔒 <b>Évaluation en cours (S8-S9)</b> : les charges max ne bougent plus.' : 'Tu as progressé ? Touche <b>Modifier</b> avec une série réussie proprement (3 à 10 répétitions). L\'ancienne valeur reste dans l\'historique.'}</p><table class="tb"><tr><th>Atelier</th><th>Charge max</th><th></th></tr>${ats.map(a => {const r = e.rm[a.id], h = r && r.hist && r.hist.length ? r.hist : null;return `<tr><td>${esc(a.nom)} <span class="small muted">${esc(a.groupe)}</span></td><td>${r ? `${h ? `<span class="small muted">${h.map(x => fmtKg(x.cm)).join(' → ')} →</span> ` : ''}<b>${fmtKg(r.cm)}</b>${h && r.cm > h[0].cm ? ` <b class="okc">+${Math.round(100 * (r.cm / h[0].cm - 1))} %</b>` : ''}<br><span class="small muted">${esc(MODE_RM[r.mode] || r.mode)} · ${esc(r.date)}</span>` : '—'}</td><td><button type="button" class="bt mini" data-calc="${a.id}"${r ? '' : ' disabled'}>%</button> <button type="button" class="bt mini" data-direct="${a.id}"${rmVerrou(e) ? ' disabled' : ''}>${r ? 'Modifier' : '✏️ Saisir'}</button></td></tr>`}).join('')}</table></section>
    <section class="carte info"><h3>🧮 Calculette libre</h3><p class="small">Tape une charge max et choisis le matériel : l'appli donne les charges de 30 à 80 % et les disques à mettre.</p><button type="button" class="bt" data-act="calcLibre">Ouvrir la calculette</button></section>`;
 }
 function tableauCharges(sup, cm){
@@ -650,6 +665,7 @@ function binomeDemo(){
   e1.situe = {freq:'2', bien:'Oui', ecran:'2 à 4 h', envie:['galbe', 'tonus']};e2.situe = {freq:'4', bien:'Oui', ecran:'Moins de 2 h', envie:['sport']};
   const rm = (e, l) => l.forEach(([at, cm]) => e.rm[at] = {cm, charge:Math.round(cm * .75), reps:10, date:'2026-11-17', mode:'test'});
   rm(e1, [['dch', 14], ['dc', 24], ['rowh', 12], ['curlb', 16], ['extri', 14], ['dm', 8], ['fentes', 10], ['squath', 16], ['hip', 30], ['rowb', 20]]);
+  e1.rm.dch.hist = [{cm:12, date:'2026-11-10', mode:'test'}];   // v2.2 : historique de démonstration
   rm(e2, [['dch', 22], ['dc', 40], ['rowh', 18], ['curlb', 26], ['extri', 22], ['dm', 13], ['fentes', 16], ['squath', 24], ['sdtj', 20]]);
   e1.tests.dc = {series:[{charge:12, valides:10, norep:0}, {charge:16, valides:10, norep:0}, {charge:20, valides:7, norep:1}], ressentis:{premiere:{note:4, mot:'léger'}, derniere:{note:8, mot:'ça brûle'}}};
   e1.seances.S1 = {ech:{pouls:148, debut:{note:3, mot:'chaud'}, fin:{note:5, mot:'essoufflé'}}, circuit:Object.fromEntries(CIRCUIT_S1.slice(0, 10).map(x => [x, true]))};
@@ -692,6 +708,8 @@ document.addEventListener('click', async ev => {
   if(d.clevu){const v = avisDe(d.clevu);v.cle = v.cle === d.v ? '' : d.v;sauver();rendre();return}
   if(d.propres){const v = avisDe(d.propres), p = prevuDe(EL(), SEANCE, d.propres), mx = p ? p.reps : 30;v.propres = Math.max(0, Math.min(mx, (v.propres != null ? v.propres : mx) + (v.propres != null ? +d.d : 0)));sauver();rendre();return}
   if(d.objk){const v = avisDe(d.objk);v.obj = v.obj && v.obj.k === d.v ? null : {k:d.v, v:''};sauver();rendre();return}
+  if(d.majrm){const e = EL(), x = exoCourant(d.majrm), p = prevuDe(e, SEANCE, d.majrm), sg = suggestionRM(e, d.majrm, x, p);if(sg){majRM(e, d.majrm, {cm:sg.est, charge:sg.charge, reps:x.real.reps, date:jour(), mode:'seance', S:SEANCE});x.rmMaj = sg.est;sauver();toast('Charge max : ' + fmtKg(sg.est))}rendre();return}
+  if(d.nonrm){exoCourant(d.nonrm).rmNon = true;sauver();rendre();return}
   if(d.excle){sea(EL(), SEANCE).exCle = d.excle;sauver();rendre();return}
   if(d.ouvrir){OUVERT.add(d.ouvrir);rendre();return}
   if(d.replier){OUVERT.delete(d.replier);rendre();const z = $('ex-' + d.replier);if(z)z.scrollIntoView({block:'nearest'});return}
@@ -745,7 +763,7 @@ document.addEventListener('click', async ev => {
       if(!se || !rp)return toast('Séries et répétitions.');if(!a.temps && rp < 3)return toast('Jamais moins de 3 répétitions.');
       ex.real = {series:se, reps:rp, charge:ch, niv:p.niv, diff:true};sauver();fermerFen();rendre();break}
     case 'valDirect': {const ch = num($('dCh').value), rp = parseInt($('dRp').value, 10), cm = brzycki(ch, rp);if(!cm){$('dRes').textContent = 'Une charge et 3 à 10 répétitions.';return}
-      EL().rm[d.at] = {cm, charge:ch, reps:rp, date:jour(), mode:'direct'};sauver();fermerFen();rendre();toast('Charge max : ' + fmtKg(cm));break}
+      if(rmVerrou(EL()))return toast('Charges max bloquées pendant l\'évaluation (S8-S9).');majRM(EL(), d.at, {cm, charge:ch, reps:rp, date:jour(), mode:'direct'});sauver();fermerFen();rendre();toast('Charge max : ' + fmtKg(cm));break}
     case 'annulerTest': if(T.series.length && !confirm('Quitter le test sans enregistrer ?'))return;T = null;rendreTest();rendre();break;
     case 'tPlus': T.cpt++;T.suite = 0;if(T.cpt >= 10)finSerie();else rendreTest();break;
     case 'tNo': T.norep++;T.suite++;if(T.suite >= 2)finSerie();else rendreTest();break;
