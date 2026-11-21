@@ -267,7 +267,7 @@ function carteEchauffement(s1){   // v3.0 : échauffement guidé en 5 parties, c
      <button type="button" class="wpart-min" data-wtim="${x.min * 60}" aria-label="Minuteur ${x.min} min">⏱ ${x.min}′</button>
      <details class="wdet"${OUV_ECH.has(x.k) ? ' open' : ''} data-wdet="${x.k}"><summary>Voir le détail${x.compte ? ' · ' + x.compte(has) : ''}</summary>${x.intro ? `<p class="small muted">${esc(x.intro)}</p>` : ''}<div class="wgrid">${x.l.map(id => typeof id === 'string' ? carte(id, (x.star || []).includes(id)) : id.html).join('')}</div></details></div>`}).join('');
   return `<section class="carte"><h3>🔥 Notre échauffement · ${faites}/${P.length}</h3>
-   <p class="small muted">Environ 15 min, à faire à deux : une coche vaut pour le binôme. Touche une partie quand elle est faite, ou coche les exercices dans « Voir le détail ».</p>
+   <p class="small muted">Environ 18 min, à faire à deux : une coche vaut pour le binôme. Touche une partie quand elle est faite, ou coche les exercices dans « Voir le détail ».</p>
    <div class="wtimer" id="wtimer"${WT ? '' : ' hidden'}><span id="wtt">0:00</span><button type="button" class="bt mini" data-wta="stop">Arrêter</button></div>
    ${parts}
    <div class="rangee" style="margin-top:8px"><button type="button" class="bt mini" data-act="pouls">❤️ Prendre mon pouls</button>${ech.pouls ? `<b>${ech.pouls} puls/min</b>` : ''}</div>
@@ -287,10 +287,10 @@ function partiesEch(n){
   const puiss = SEANCE === 'S6' || (n >= SEANCE_PROJET && EL().projet && EL().projet.mob === 'puiss');
   if(puiss)renf.unshift('sjump');
   const P = [
-   {k:'P1', t:'1 · Cardio', min:4, r:'Course ou corde à sauter, puis 2 exercices au choix', intro:'Jusqu\'à la sensation de chaleur et un léger essoufflement.', l:cardio, compte:h => nb(h, cardio) + ' / 2 au choix', ok:h => h('P1') || nb(h, cardio) >= 2},
+   {k:'P1', t:'1 · Cardio', min:5, r:'Course ou corde à sauter, puis 4 exercices au choix', intro:'Jusqu\'à la sensation de chaleur et un léger essoufflement.', l:cardio, compte:h => nb(h, cardio) + ' / 4 au choix', ok:h => h('P1') || nb(h, cardio) >= 4},
    {k:'P2', t:'2 · Articulaire', min:2, r:'Chevilles, genoux, hanches, buste, épaules, poignets', intro:'Dans cet ordre, de bas en haut : 10 cercles dans chaque sens.', l:mob, compte:h => nb(h, mob) + ' / 6', ok:h => h('P2') || nb(h, mob) === mob.length},
-   {k:'P3', t:'3 · Activation', min:3, r:star.length ? '3 au choix : les ★ préparent tes exercices du jour' : '3 au choix, 10 répétitions lentes', intro:'Le placement des ateliers, sans charge.', l:act, star, compte:h => nb(h, act) + ' / 3 au choix', ok:h => h('P3') || nb(h, act) >= 3},
-   {k:'P4', t:'4 · Renforcement', min:3, r:'3 au choix, à ton niveau', intro:'Pompes : choisis ton niveau, du mur aux pompes classiques.' + (puiss ? ' Séance Puissance : le squat jump en plus.' : ''), l:renf, compte:h => nb(h, renf) + ' / 3 au choix', ok:h => h('P4') || nb(h, renf) >= 3}];
+   {k:'P3', t:'3 · Activation', min:4, r:star.length ? '4 au choix : les ★ préparent tes exercices du jour' : '4 au choix, 10 répétitions lentes', intro:'Le placement des ateliers, sans charge.', l:act, star, compte:h => nb(h, act) + ' / 4 au choix', ok:h => h('P3') || nb(h, act) >= 4},
+   {k:'P4', t:'4 · Renforcement', min:4, r:'4 au choix, à ton niveau', intro:'Pompes : choisis ton niveau, du mur aux pompes classiques.' + (puiss ? ' Séance Puissance : le squat jump en plus.' : ''), l:renf, compte:h => nb(h, renf) + ' / 4 au choix', ok:h => h('P4') || nb(h, renf) >= 4}];
   if(n >= 4 && jour.length){const sp = jour.map(at => 'sp:' + at);
     P.push({k:'P5', t:'5 · Spécifique', min:3, r:'1 série de 10 sans charge de chaque exercice du jour', intro:'En soignant le placement : c\'est le geste de ta série, sans le poids.', compte:h => nb(h, sp) + ' / ' + sp.length, ok:h => h('P5') || nb(h, sp) === sp.length,
       l:jour.map(at => {const a = atelier(at);return {html:`<button type="button" class="wcard${(sea(EL(), SEANCE).ech || {}).wc && sea(EL(), SEANCE).ech.wc.includes('sp:' + at) ? ' on' : ''}" data-wc="sp:${at}"><img src="${imgAtelier(at) || ''}" alt="" loading="lazy"><b>${esc(a.nom)}</b><span>${esc(POINT_CLE[at] || '')}</span></button>`}})});}
