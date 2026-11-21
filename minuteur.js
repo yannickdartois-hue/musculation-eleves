@@ -97,3 +97,80 @@ function ouvrir(o){
 }
 root.MinuteurM = {ouvrir};
 })(window);
+
+/* =====================================================================
+   v4.0 — chrono binôme : écran coupé en deux (A en haut, B en bas).
+   Celui qui travaille est en vert, celui qui récupère en rouge : il regarde son partenaire
+   (point clé, ✓ tenu / ✗ à revoir). « Série finie » : les rôles s'échangent ; la série du partenaire
+   sert de récupération, la récupération minimale du mobile reste affichée.
+   p : [{prenom, nom (exercice), img, mob, series, reps, temps, chargeTxt, recupS, cle}, {...}]
+   onFin({cle:[a,b], faites:[n,n]}) ; onQuitter()
+   ===================================================================== */
+(function(root){
+'use strict';
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const mmss = s => {s = Math.max(0, Math.round(s));return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0')};
+const nb = v => Array.isArray(v) ? v[1] : (+v || 0);
+let ac = null, lock = null;
+function son(f, d){let m = 'sound';try{m = localStorage.getItem('eps_sound_mode') || 'sound'}catch(e){}if(m === 'silent')return;
+  if(m === 'vibrate'){try{navigator.vibrate && navigator.vibrate(200)}catch(e){}return}
+  try{ac = ac || new (window.AudioContext || window.webkitAudioContext)();if(ac.state === 'suspended')ac.resume();const o = ac.createOscillator(), g = ac.createGain(), t = ac.currentTime;o.frequency.value = f;g.gain.setValueAtTime(.35, t);g.gain.exponentialRampToValueAtTime(.001, t + d);o.connect(g);g.connect(ac.destination);o.start(t);o.stop(t + d)}catch(e){}}
+async function eveil(on){try{if(on && navigator.wakeLock)lock = await navigator.wakeLock.request('screen');else if(lock){lock.release();lock = null}}catch(e){}}
+
+function binome(P, opts){
+  const N = P.map(p => Math.max(1, nb(p.series)));
+  const st = P.map(() => ({faites:0, repos:null, cle:null}));
+  let qui = 0, debut = Date.now() + 3000, tick = null;   // décompte 3 s avant la 1re série
+  const div = document.createElement('div');div.className = 'chb';document.body.appendChild(div);
+  document.documentElement.classList.add('chrono-ouvert');eveil(true);
+  const fini = i => st[i].faites >= N[i];
+  const reposRestant = i => st[i].repos == null ? 0 : P[i].recupS - (Date.now() - st[i].repos) / 1000;
+  function moitie(i){
+    const p = P[i], s = st[i], o = 1 - i, autre = P[o], travail = qui === i && !fini(i), now = Date.now();
+    const pills = `<div class="chb-pills">${Array.from({length:N[i]}, (_, k) => `<span class="${k < s.faites ? 'ok' : k === s.faites && travail ? 'ici' : ''}">${k + 1}</span>`).join('')}</div>`;
+    if(fini(i))return `<section class="chb-m fin"><div class="chb-l"><b>${esc(p.prenom)}</b> · ✓ TERMINÉ</div><p>${esc(p.nom)} : ${N[i]} séries faites.${!fini(o) ? ` Tu restes coach de ${esc(autre.prenom)} jusqu'à la fin.` : ''}</p>${!fini(o) ? coach(i) : ''}</section>`;
+    if(travail){
+      const prep = now < debut, attente = !prep ? reposRestant(i) : 0;
+      if(prep)return `<section class="chb-m prep"><div class="chb-l"><b>${esc(p.prenom)}</b> · ⏳ PRÊT ?</div><div class="chb-t">${Math.max(1, Math.ceil((debut - now) / 1000))}</div>${pills}<p>${esc(p.nom)} · ${esc(p.chargeTxt || '')}</p></section>`;
+      if(fini(o) && attente > 0 && !s.force)return `<section class="chb-m rep"><div class="chb-l"><b>${esc(p.prenom)}</b> · ⏸ REPOS</div>${pills}<div class="chb-t">${mmss(attente)}</div><p class="chb-rec">${esc(autre.prenom)} a fini : tu enchaînes seul(e) après ta récupération.</p><button type="button" class="chb-bt" data-b="go">Je repars quand même</button></section>`;
+      const e = (now - Math.max(debut, s.go || debut, fini(o) && !s.force && s.repos ? s.repos + p.recupS * 1000 : 0)) / 1000;
+      return `<section class="chb-m trav"><div class="chb-l"><b>${esc(p.prenom)}</b> · 💪 TRAVAIL</div>${pills}
+        <div class="chb-ligne"><img src="${esc(p.img || '')}" alt="" onerror="this.remove()"><div><div class="chb-t">${p.temps ? mmss(nb(p.reps) - e) : mmss(e)}</div>
+        <p><b>Série ${s.faites + 1}/${N[i]}</b> · ${esc(String(nb(p.reps)))} ${p.temps ? 's' : 'rép.'}${p.chargeTxt ? ' · ' + esc(p.chargeTxt) : ''}<br>${esc(p.nom)}</p></div></div>
+        ${attente > 0 ? `<p class="chb-att">⚠️ Récupération pas finie : encore ${mmss(attente)} conseillées</p>` : ''}
+        <button type="button" class="chb-bt" data-b="fin">✓ Série finie</button></section>`;
+    }
+    const r = reposRestant(i), pret = r <= 0;
+    return `<section class="chb-m rep"><div class="chb-l"><b>${esc(p.prenom)}</b> · ⏸ REPOS</div>${pills}
+      <p class="chb-rec">${s.repos == null ? 'Tu commences après ' + esc(autre.prenom) + '.' : pret ? 'Récupération minimale faite ✓' : 'Récupération : encore <b>' + mmss(r) + '</b>'}${!fini(o) ? '' : ''}</p>
+      ${!fini(o) ? coach(i) : `<button type="button" class="chb-bt" data-b="go">${pret ? 'À moi : série suivante' : 'Je repars quand même'}</button>`}</section>`;
+  }
+  function coach(i){const o = 1 - i, a = P[o], c = st[o].cle;
+    return `<div class="chb-coach">👀 <b>Tu regardes ${esc(a.prenom)}</b>${a.cle ? ` : 🎯 ${esc(a.cle)}` : ''}<div class="chb-cb"><button type="button" class="${c === '1' ? 'on' : ''}" data-b="cle" data-o="${o}" data-v="1">✓ Tenu</button><button type="button" class="${c === '0' ? 'on' : ''}" data-b="cle" data-o="${o}" data-v="0">✗ À revoir</button></div></div>`}
+  function rendu(){
+    if(fini(0) && fini(1)){
+      div.innerHTML = `<div class="chb-fin"><h2>🎉 Binôme terminé</h2>${P.map((p, i) => `<p><b>${esc(p.prenom)}</b> : ${esc(p.nom)}, ${st[i].faites} séries${st[i].cle ? ` · point clé ${st[i].cle === '1' ? 'tenu ✓' : 'à revoir'} (vu par ${esc(P[1 - i].prenom)})` : ''}</p>`).join('')}
+        <p>Enregistre, puis chacun note son ressenti et son coach écrit son conseil.</p><button type="button" class="chb-bt" data-b="ok">✓ Enregistrer les deux</button><button type="button" class="chb-bt sec" data-b="quit">Fermer sans enregistrer</button></div>`;return}
+    div.innerHTML = `<button type="button" class="chb-x" data-b="quit" aria-label="Quitter">✕</button>${moitie(0)}${moitie(1)}`;
+  }
+  function bascule(){const i = qui;st[i].faites++;st[i].repos = Date.now();st[i].bip = false;st[i].force = false;son(1320, .35);
+    const o = 1 - i;if(!fini(o))qui = o;if(fini(0) && fini(1))son(880, .6);st[qui].go = Date.now();rendu()}
+  div.addEventListener('click', ev => {const b = ev.target.closest('[data-b]');if(!b)return;const a = b.dataset.b;
+    if(a === 'fin'){bascule();return}
+    if(a === 'go'){st[qui].force = true;st[qui].go = Date.now();son(1320, .35);rendu();return}
+    if(a === 'cle'){const o = +b.dataset.o;st[o].cle = st[o].cle === b.dataset.v ? null : b.dataset.v;rendu();return}
+    if(a === 'ok'){fermer();opts.onFin && opts.onFin({cle:st.map(s => s.cle), faites:st.map(s => s.faites)});return}
+    if(a === 'quit'){if(!(fini(0) && fini(1)) && !confirm('Quitter le chrono binôme ? Rien ne sera enregistré.'))return;fermer();return}
+  });
+  let dernier = -1;
+  function boucle(){const now = Date.now();
+    if(now < debut){const s = Math.ceil((debut - now) / 1000);if(s !== dernier){dernier = s;son(880, .12)}}
+    else if(dernier !== 0){dernier = 0;son(1320, .4);st[qui].go = debut}
+    // bip quand la récupération minimale de celui qui attend est atteinte
+    P.forEach((p, i) => {if(st[i].repos != null && !st[i].bip && reposRestant(i) <= 0){st[i].bip = true;son(660, .2)}});
+    if(!(fini(0) && fini(1)))rendu()}
+  function fermer(){clearInterval(tick);eveil(false);div.remove();document.documentElement.classList.remove('chrono-ouvert')}
+  tick = setInterval(boucle, 500);rendu();
+}
+root.MinuteurM = Object.assign(root.MinuteurM || {}, {binome});
+})(window);

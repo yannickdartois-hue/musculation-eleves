@@ -264,6 +264,30 @@ html.chrono-ouvert body{overflow:hidden}
 .calc-pas{display:flex;align-items:center;justify-content:space-between;border:1px solid var(--trait);border-radius:12px;padding:4px}
 .calc-pas button{width:48px;height:48px;border:0;border-radius:10px;background:#ecfccb;font:900 24px system-ui;color:#365314}.calc-pas b{font:900 28px "Archivo",system-ui}
 @media (max-width:380px){.calc-grille{grid-template-columns:repeat(2,1fr)}}
+
+/* v4.0 : chrono binôme (écran coupé en deux) */
+.chb{position:fixed;inset:0;z-index:80;display:flex;flex-direction:column;background:#0f172a;color:#fff}
+.chb-m{flex:1 1 50%;min-height:0;overflow:auto;padding:10px 14px;display:flex;flex-direction:column;gap:6px;border-bottom:4px solid #0f172a;transition:background .3s}
+.chb-m:first-of-type{padding-top:max(10px,env(safe-area-inset-top))}
+.chb-m.trav{background:#15803d}.chb-m.rep{background:#b91c1c}.chb-m.prep{background:#b45309}.chb-m.fin{background:#1e3a8a}
+.chb-l{font:900 clamp(22px,6vw,40px)/1.05 "Archivo",system-ui,sans-serif;letter-spacing:.03em}
+.chb-t{font:900 clamp(40px,11vw,72px)/1 "Archivo",system-ui,sans-serif;font-variant-numeric:tabular-nums}
+.chb-ligne{display:flex;gap:12px;align-items:center}.chb-ligne img{width:34%;max-width:170px;max-height:22vh;object-fit:contain;background:#fff;border-radius:12px}
+.chb-ligne p{margin:4px 0 0}
+.chb-pills{display:flex;gap:5px}.chb-pills span{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:13px;background:rgba(0,0,0,.25)}
+.chb-pills .ok{background:rgba(0,0,0,.5)}.chb-pills .ici{background:#fff;color:#111}
+.chb-rec{font-size:18px;margin:2px 0}
+.chb-att{background:rgba(0,0,0,.25);border-radius:10px;padding:6px 10px;margin:0;font-weight:700}
+.chb-coach{background:rgba(0,0,0,.25);border-radius:12px;padding:8px 10px;font-size:16px}
+.chb-cb{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px}
+.chb-cb button{border:2px solid rgba(255,255,255,.7);background:transparent;color:#fff;border-radius:10px;padding:10px;font:inherit;font-weight:800}
+.chb-cb button.on{background:#fff;color:#b91c1c}
+.chb-bt{border:0;border-radius:14px;padding:14px;font:inherit;font-size:19px;font-weight:900;background:#fff;color:#15803d;width:100%;margin-top:auto}
+.chb-m.rep .chb-bt{color:#b91c1c}.chb-bt.sec{background:transparent;color:#fff;border:2px solid #fff;margin-top:8px}
+.chb-x{position:absolute;right:10px;top:max(8px,env(safe-area-inset-top));z-index:2;width:40px;height:40px;border-radius:50%;border:2px solid rgba(255,255,255,.7);background:rgba(0,0,0,.3);color:#fff;font-size:18px}
+.chb-fin{margin:auto;max-width:520px;padding:24px;text-align:center}
+.chb-pub{border:2px solid #15803d}
+.onglet-aide{margin:6px 0 10px;padding:8px 12px;border-radius:12px;background:#f7fee7;border:1px solid #d9f99d;font-size:14px;color:#365314}
 </style>
 <style>/* Lisibilité terrain : textes à 15 px minimum à l'écran ; tailles d'origine à l'impression. */@media print{:root{--fs-min:0px}}</style>
 <link rel="stylesheet" href="eps-charte-v1.css">

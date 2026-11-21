@@ -27,7 +27,14 @@ let ONGLET = 'seance';
 let FICHES_LIBRES = false;   // v2.6 : onglet Fiches consultable depuis l'accueil, sans carnet
 let SEANCE = 'S1';
 let DEMO = false;
-const ONGLETS = [['seance','🏋️','Séance'],['charges','⚖️','Charges max'],['projet','🎯','Projet'],['carnet','📒','Carnet'],['fiches','📖','Fiches'],['envoyer','📤','Envoyer']];
+/* v4.0 : une phrase en tête de chaque onglet pour dire à quoi il sert */
+const AIDE_ONGLET = {seance:"✏️ <b>On remplit ici pendant le cours</b> : échauffement, exercices, chrono, ressentis, coaching. Tout s'enregistre dans ton carnet.",
+ charges:"⚖️ <b>Tes charges max</b> (une par atelier) et la calculette : la charge à mettre selon le %.",
+ projet:"🎯 <b>À partir de la S7</b> : ton programme (mobile, exercices, séries, %). L'onglet Séance le suit ensuite.",
+ carnet:"📒 <b>Lecture seule</b> : le résumé de tout ce que tu as saisi dans Séance, séance par séance. Rien à remplir ici.",
+ fiches:"📖 <b>Pour consulter</b> : les 3 mobiles, les fiches des ateliers et l'échauffement.",
+ envoyer:"📤 <b>En fin de séance</b> : envoie ton carnet au professeur (QR code ou fichier)."};
+const ONGLETS = [['seance','🏋️','Séance'],['charges','⚖️','Charges max'],['projet','🎯','Projet'],['carnet','📒','Carnet'],['fiches','📖','Fiches'],['envoyer','📤','Au prof']];
 const SEANCES_IDS = SEANCES.map(s => s.id);
 /* v2.0 : S2-S3 tests, S4 tonification, S5 volume, S6 puissance et choix, S7 projet, S8-S9 évaluation */
 const MOBILE_DU_JOUR = {S4:'tonif', S5:'volume', S6:'puiss'};
@@ -62,7 +69,7 @@ function rendre(){
   const qui = `<div class="qui"><span>Qui pratique ?</span>${B.e.map((x, i) => `<button type="button" data-qui="${i}" class="${i === P ? 'ici' : ''}">${esc(prenom(x.nom))}</button>`).join('')}</div>`;
   const demo = DEMO ? `<div class="demo-bandeau"><span>👀 <b>Mode démo</b> : rien n'est enregistré.</span><button type="button" class="bt mini" data-act="quitterDemo">Quitter</button></div>` : '';
   const corps = {seance:vueSeance, charges:vueCharges, projet:vueProjet, carnet:vueCarnet, fiches:vueFiches, envoyer:vueEnvoyer}[ONGLET]();
-  $('main').innerHTML = demo + (ONGLET === 'envoyer' || ONGLET === 'fiches' ? '' : qui) + corps;
+  $('main').innerHTML = demo + `<p class="onglet-aide">${AIDE_ONGLET[ONGLET] || ''}</p>` + (ONGLET === 'envoyer' || ONGLET === 'fiches' ? '' : qui) + corps;
   window.scrollTo(0, y);
 }
 
@@ -318,6 +325,27 @@ function ouvrirFiche(id){
    ${ficheImg(id) ? `<button type="button" class="bt pleine" data-poster="${id}" style="margin-top:10px">📖 Voir la fiche complète</button>` : ''}
    <button type="button" class="bt pleine" data-act="fermerFen" style="margin-top:10px">Fermer</button>`);
 }
+/* v4.0 : chrono binôme */
+function exosEleve(e){const n = +SEANCE.slice(1);if(n >= SEANCE_PROJET)return ((e.projet && e.projet.exos) || []).map(x => x.at);return B.listes[SEANCE] || LISTES_DEFAUT[SEANCE] || []}
+function choixBinome(){
+  const opt = (e, i) => {const l = exosEleve(e), s = sea(e, SEANCE).exos || {}, def = l.find(at => !(s[at] && s[at].real)) || l[0];
+    if(!l.length)return `<p class="retour non">${esc(prenom(e.nom))} n'a pas encore d'exercices pour cette séance${+SEANCE.slice(1) >= SEANCE_PROJET ? ' (projet à construire dans l\'onglet Projet)' : ''}.</p>`;
+    return `<label class="ch">${esc(prenom(e.nom))}</label><select id="cb${i}">${l.map(at => `<option value="${at}"${at === def ? ' selected' : ''}>${esc(atelier(at).nom)}${s[at] && s[at].real ? ' ✓ fait' : ''}</option>`).join('')}</select>`};
+  fenetre(`<div class="rangee" style="justify-content:space-between"><h3>⏱ Chrono binôme</h3><button type="button" class="bt mini" data-act="fermerFen">Fermer</button></div>
+   <p class="small">Choisissez l'exercice de chacun. ${prenom(B.e[0].nom)} commence.</p>${B.e.slice(0, 2).map(opt).join('')}
+   ${B.e.slice(0, 2).every(e => exosEleve(e).length) ? `<button type="button" class="bt act pleine" data-act="goBinome" style="margin-top:12px">▶ Lancer</button>` : ''}`);
+}
+function lancerBinome(){
+  const E2 = B.e.slice(0, 2), ats = [$('cb0').value, $('cb1').value];fermerFen();
+  const P = E2.map((e, i) => {const at = ats[i], a = atelier(at), p = prevuDe(e, SEANCE, at) || {}, M = MOBILES[p.mob] || {};
+    const ch = p.charge && p.charge.charge ? fmtKg(p.charge.charge) : (a.niveaux && p.niv != null ? 'Niv. ' + (p.niv + 1) : '');
+    return {prenom:prenom(e.nom), nom:a.nom, img:imgAtelier(at), mob:p.mob, series:p.series || 3, reps:p.reps || 10, temps:!!a.temps, chargeTxt:ch, recupS:M.recupS || 90, cle:POINT_CLE[at] || ''}});
+  MinuteurM.binome(P, {onFin:r => {
+    E2.forEach((e, i) => {const at = ats[i], s = sea(e, SEANCE);s.exos = s.exos || {};const x = s.exos[at] = s.exos[at] || {}, p = prevuDe(e, SEANCE, at);
+      if(r.faites[i] > 0)x.real = {series:r.faites[i], reps:p ? p.reps : 10, charge:p && p.charge ? p.charge.charge : null, niv:p ? p.niv : null, diff:!!(p && r.faites[i] !== p.series)};
+      if(r.cle[i]){x.avis = x.avis || {signes:[], conseil:''};x.avis.par = E2[1 - i].nom;x.avis.cle = r.cle[i]}});
+    sauver();rendre();toast('Enregistré pour vous deux : notez vos ressentis et vos conseils.')}});
+}
 /* v2.12 : chrono des séries (minuteur.js) : temps de travail, récupération du mobile, dessin, point clé pour le coach */
 function lancerChrono(at){
   const e = EL(), a = atelier(at), p = prevuDe(e, SEANCE, at);if(!p)return toast('Pas de paramètres prévus pour cet exercice.');
@@ -491,7 +519,8 @@ function carteMobile(mob){return mob ? `<div class="mob-bandeau"><img src="${MOB
 function listeExos(ids, projet){
   const e = EL(), S = SEANCE, s = sea(e, S);s.exos = s.exos || {};
   if(!projet){const l = B.listes[S];if(l)ids = l}
-  return `<h3 style="margin-top:16px">Les exercices · ${esc(prenom(e.nom))}</h3>${projet ? '' : `<p class="small muted">Liste du binôme ; <button type="button" class="lien" data-act="changerListe">changer un exercice</button>.</p>`}` + ids.map(at => carteExo(at, at === (s.exCle && ids.includes(s.exCle) ? s.exCle : ids[0]))).join('');
+  const bin = B.e.length > 1 && window.MinuteurM && MinuteurM.binome ? `<section class="carte chb-pub"><h3>⏱ Chrono binôme</h3><p class="small">Un seul écran pour vous deux : l'un travaille (vert), l'autre récupère et le regarde (rouge). « Série finie » : vous échangez.</p><button type="button" class="bt act pleine" data-act="chronoBinome">Lancer le chrono binôme</button></section>` : '';
+  return bin + `<h3 style="margin-top:16px">Les exercices · ${esc(prenom(e.nom))}</h3>${projet ? '' : `<p class="small muted">Liste du binôme ; <button type="button" class="lien" data-act="changerListe">changer un exercice</button>.</p>`}` + ids.map(at => carteExo(at, at === (s.exCle && ids.includes(s.exCle) ? s.exCle : ids[0]))).join('');
 }
 const OUVERT = new Set();   // fiches terminées rouvertes à la main
 function carteExo(at, estCle){
@@ -862,6 +891,8 @@ document.addEventListener('click', async ev => {
     case 'demo': DEMO = true;B = binomeDemo();P = 0;ONGLET = 'seance';SEANCE = 'S5';rendre();window.scrollTo(0, 0);break;
     case 'quitterDemo': DEMO = false;B = null;rendre();break;
     case 'mobiles': panneauMobiles();break;
+    case 'chronoBinome': choixBinome();break;
+    case 'goBinome': lancerBinome();break;
     case 'calcUtiliser': CALC.cm = +d.cm;CALC.mode = 'pct';rendreCalc();break;
     case 'fichesLibres': FICHES_LIBRES = true;rendre();window.scrollTo(0, 0);break;
     case 'fichesRetour': FICHES_LIBRES = false;rendre();window.scrollTo(0, 0);break;
