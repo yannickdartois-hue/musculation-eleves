@@ -33,7 +33,7 @@ const MOBILE_DU_JOUR = {S4:'tonif', S5:'volume', S6:'puiss'};
 const LISTES_DEFAUT = {S4:['dch','rowh','dm','squath','fentes','hip'], S5:['dch','rowb','squath','sdtj'], S6:['dch','rowh','squath','hip']};
 const SEANCE_PROJET = 7, SEANCE_MOBILE = [4, 6];
 /* ateliers proposés pour un mobile : le menu (charges), et en Puissance seulement les 6 ateliers poussés vite */
-const dispoPour = mob => ATELIERS.filter(a => a.menu && (mob !== 'puiss' || a.puissance));
+const dispoPour = mob => ATELIERS.filter(a => a.plio ? mob === 'puiss' : a.menu && (mob !== 'puiss' || a.puissance));   // v2.5 : saut sur box, Puissance seulement
 const DEF_PARAM = {tonif:{pct:55, series:3, reps:15}, volume:{pct:70, series:4, reps:10}, puiss:{pct:45, series:4, reps:5}};
 const TEMPS = {tonif:'30 à 45 s', volume:'40 à 60 s', puiss:'15 s'};
 const FORME = [[1,'😫','Très fatigué'],[2,'😕','Fatigué'],[3,'😐','Normal'],[4,'🙂','En forme'],[5,'😀','Très en forme']];
@@ -598,7 +598,7 @@ function controleProjet(pr){
   if(n < m.nbEx[0] || n > m.nbEx[1])l.push([false, `${m.nom} : ${m.nbEx[0] === m.nbEx[1] ? m.nbEx[0] : m.nbEx[0] + ' à ' + m.nbEx[1]} exercices (tu en as ${n}).`]);else l.push([true, `${n} exercices.`]);
   ['haut', 'bas'].forEach(z => {if(!zones.has(z))l.push([false, `Il manque un exercice ${z === 'haut' ? 'du haut du corps' : 'du bas du corps'} (développement harmonieux).`])});
   if(zones.has('haut') && zones.has('bas'))l.push([true, 'Haut et bas du corps : équilibré.']);
-  pr.exos.forEach(x => {const a = atelier(x.at);if(!a.menu)l.push([false, `${a.nom} : n'est plus proposé (poids du corps, à l'échauffement). Remplace-le.`]);else if(pr.mob === 'puiss' && !a.puissance)l.push([false, `${a.nom} : ne se travaille pas en Puissance (geste lent ou dos chargé).`])});
+  pr.exos.forEach(x => {const a = atelier(x.at);if(a.plio){if(pr.mob !== 'puiss')l.push([false, `${a.nom} : réservé au mobile Puissance. Remplace-le.`])}else if(!a.menu)l.push([false, `${a.nom} : n'est plus proposé (poids du corps, à l'échauffement). Remplace-le.`]);else if(pr.mob === 'puiss' && !a.puissance)l.push([false, `${a.nom} : ne se travaille pas en Puissance (geste lent ou dos chargé).`])});
   const d = dureeProjet(pr.mob, pr.exos);l.push([d <= 60, `Durée estimée en binôme : ${d} min ${d <= 60 ? '(tient dans la séance)' : '(trop long : enlève un exercice ou une série)'}.`]);
   pr.exos.forEach(x => {const a = atelier(x.at);if(a.places)l.push([true, `${a.nom} : ${a.places} binômes au maximum en même temps, prévois une variante.`]);
     if(a.type === 'charge' && !cmDe(EL(), x.at))l.push([false, `${a.nom} : pas de charge max (saisie directe dans Charges).`])});
