@@ -178,6 +178,27 @@ summary{cursor:pointer;font-weight:700;min-height:44px;display:flex;align-items:
 .illu{display:block;width:100%;max-width:420px;margin:8px auto;background:#fff;border-radius:12px}
 .version{font-size:13px;color:var(--repere);border:1px solid var(--trait);border-radius:8px;padding:0 6px}
 @media print{.nav,.mobiles-flottant,.qui{display:none}}
+
+/* v2.12 : chrono des séries */
+.chrono-bt{margin:8px 0}
+html.chrono-ouvert #eps-version,html.chrono-ouvert #eps-conf,html.chrono-ouvert #eps-rappel,html.chrono-ouvert .eps-demo,html.chrono-ouvert #eps-demo,html.chrono-ouvert .epsa-btn{display:none!important}
+html.chrono-ouvert body{overflow:hidden}
+.chm{position:fixed;inset:0;z-index:80;background:#0f172a;color:#fff;overflow:auto;-webkit-overflow-scrolling:touch}
+.chm-in{max-width:640px;margin:0 auto;padding:max(12px,env(safe-area-inset-top)) 16px 24px;display:flex;flex-direction:column;gap:10px}
+.chm-tete{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;font-size:15px}.chm-tete span{color:#cbd5e1;font-size:13px}
+.chm-bts{display:flex;gap:6px;flex:none}
+.chm-mini{border:1px solid #475569;background:#1e293b;color:#fff;border-radius:10px;padding:8px 10px;font:inherit;font-size:14px;font-weight:700}
+.chm-series{display:flex;gap:6px;justify-content:center;flex-wrap:wrap}.chm-series span{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:#334155;font-weight:800}
+.chm-series .ok{background:#16a34a}.chm-series .ici{background:#4d7c0f;outline:3px solid #bef264}
+.chm-etat{text-align:center;font-weight:800;font-size:20px;margin:4px 0}.chm-etat.serie{color:#bef264}.chm-etat.repos{color:#7dd3fc}.chm-etat.ok{color:#86efac}
+.chm-temps{text-align:center;font:800 72px/1 "Archivo",system-ui,sans-serif;font-variant-numeric:tabular-nums}.chm-gros{font-size:120px}
+.chm-barre{height:10px;background:#334155;border-radius:6px;overflow:hidden}.chm-barre i{display:block;height:100%;width:0;background:#7dd3fc;transition:width .25s linear}
+.chm-img{width:100%;max-height:34vh;object-fit:contain;background:#fff;border-radius:14px}.chm-img.petit{max-height:20vh}
+.chm-consigne{text-align:center;color:#e2e8f0;margin:0}
+.chm-coach{background:#1e293b;border:1px solid #475569;border-radius:12px;padding:10px 12px}.chm-coach summary{font-weight:800;cursor:pointer}
+.chm-coach ul{margin:6px 0;padding-left:18px}.chm-coach li{margin:3px 0}.chm-cle{background:#422006;border-radius:8px;padding:6px 8px;margin:8px 0 4px}
+.chm-rangee{display:flex;gap:10px;justify-content:center}
+.chm-bt{border:0;border-radius:14px;padding:16px;font:inherit;font-size:18px;font-weight:800;background:#334155;color:#fff;width:100%}.chm-bt.ok{background:#16a34a}
 </style>
 <style>/* Lisibilité terrain : textes à 15 px minimum à l'écran ; tailles d'origine à l'impression. */@media print{:root{--fs-min:0px}}</style>
 <link rel="stylesheet" href="eps-charte-v1.css">
@@ -194,6 +215,7 @@ summary{cursor:pointer;font-weight:700;min-height:44px;display:flex;align-items:
 <script src="jsqr.js"></script>
 <script src="eps-code.js"></script>
 <script src="eps-pouls.js"></script>
+<script src="minuteur.js"></script>
 <script src="app.js"></script>
 <script src="aide.js"></script>
 <script src="eps-aide.js"></script>

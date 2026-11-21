@@ -278,6 +278,15 @@ function ouvrirFiche(id){
    ${ficheImg(id) ? `<button type="button" class="bt pleine" data-poster="${id}" style="margin-top:10px">📖 Voir la fiche complète</button>` : ''}
    <button type="button" class="bt pleine" data-act="fermerFen" style="margin-top:10px">Fermer</button>`);
 }
+/* v2.12 : chrono des séries (minuteur.js) : temps de travail, récupération du mobile, dessin, point clé pour le coach */
+function lancerChrono(at){
+  const e = EL(), a = atelier(at), p = prevuDe(e, SEANCE, at);if(!p)return toast('Pas de paramètres prévus pour cet exercice.');
+  const M = MOBILES[p.mob] || {}, aut = autre();
+  const ch = p.charge && p.charge.charge ? fmtKg(p.charge.charge) : (a.type === 'variante' && a.niveaux && p.niv != null ? 'Niv. ' + (p.niv + 1) : '');
+  MinuteurM.ouvrir({at, nom:a.nom, img:imgAtelier(at), mob:p.mob, mobNom:M.nom, series:p.series, reps:p.reps, temps:!!a.temps, chargeTxt:ch,
+    recupS:M.recupS || 90, cle:POINT_CLE[at] || '', crit:a.crit || [], signes:SIGNES, partenaire:aut ? prenom(aut.nom) : '',
+    onFait:() => {const b = document.createElement('button');b.type = 'button';b.dataset.fait = at;b.hidden = true;document.body.appendChild(b);b.click();b.remove()}});
+}
 /* v2.6 : fiches d'exercice complètes et répertoire de l'échauffement */
 function ouvrirPoster(id){
   const src = ficheImg(id);
@@ -293,8 +302,7 @@ function ouvrirEchauf(id){
 function vueFiches(){
   const ids = Object.keys(FICHES);
   return `<h2>📖 Fiches d'exercice</h2>
-   <section class="carte"><h3>Les ateliers</h3><p class="small muted">Touche une fiche pour l'ouvrir.</p><div class="fiches-grille">${ids.map(id => `<button type="button" class="fiche-vig" data-poster="${id}"><img src="${imgAtelier(id) || ficheImg(id)}" alt="" loading="lazy"><span>${esc(FICHES[id])}</span></button>`).join('')}</div>
-   <p class="small muted">Oiseau : fiche en préparation (voir la fiche de l'atelier dans la séance).</p></section>
+   <section class="carte"><h3>Les ateliers</h3><p class="small muted">Touche une fiche pour l'ouvrir.</p><div class="fiches-grille">${ids.map(id => `<button type="button" class="fiche-vig" data-poster="${id}"><img src="${imgAtelier(id) || ficheImg(id)}" alt="" loading="lazy"><span>${esc(FICHES[id])}</span></button>`).join('')}</div></section>
    <h2>🔥 Échauffement</h2>${ECHAUF_LIB.map(g => `<section class="carte"><h3>${esc(g.t)}</h3><p class="small muted">${esc(g.i)}</p><div class="ech-liste">${g.l.map(([id, nom, txt]) => `<button type="button" class="ech-it" data-ech="${id}"><img src="${imgEchauf(id)}" alt="" loading="lazy"><span><b>${esc(nom)}</b><br><span class="small">${esc(txt)}</span></span></button>`).join('')}</div></section>`).join('')}`;
 }
 function ficheAtelier(a){
@@ -454,6 +462,7 @@ function carteExo(at, estCle){
   if(n >= 4 && aut){const av = ex.avis || {};
     if(ex.real && coachFini(ex, estCle) && !OUVERT.has('c-' + at))h += `<button type="button" class="resume coachR" data-ouvrir="c-${at}"><span>⏱</span><span><b>${esc(prenom(aut.nom))}</b> : point clé ${av.cle === '1' ? 'tenu ✓' : 'à revoir'}${av.propres != null ? ` · ${av.propres} propres` : ''}<br><small>« ${esc(av.conseil)} »</small></span><span class="small">✎</span></button>`;
     else h += carteCoachM(at, ex, p, a, aut, estCle) + (ex.real && coachFini(ex, estCle) ? `<button type="button" class="lien" data-replier="c-${at}">Replier le coaching</button>` : '');}
+  if(!ex.real && n >= 4 && p && window.MinuteurM)h += `<button type="button" class="bt act pleine chrono-bt" data-chrono="${at}">⏱ Lancer le chrono des séries</button>`;
   if(!ex.real)h += `<div class="rangee"><button type="button" class="bt ok" data-fait="${at}">✓ Fait comme prévu</button><button type="button" class="bt" data-modif="${at}">Fait autrement</button></div>`;
   else{
     h += `<p class="small">✓ Réalisé : ${ex.real.series} séries × ${ex.real.reps}${a.temps ? ' s' : ' rép.'}${ex.real.charge ? ' à ' + fmtKg(ex.real.charge) : ''}${ex.real.diff ? ' <b>(différent du prévu)</b>' : ''} <button type="button" class="lien" data-modif="${at}">modifier</button></p>`;
@@ -739,6 +748,7 @@ document.addEventListener('click', async ev => {
   if(d.circuit){const s = sea(EL(), 'S1');s.circuit = s.circuit || {};s.circuit[d.circuit] = !s.circuit[d.circuit];sauver();rendre();return}
   if(d.situe){const e = EL();e.situe = e.situe || {};if(d.multi){const l = e.situe[d.situe] = e.situe[d.situe] || [];const i = l.indexOf(d.v);i < 0 ? l.push(d.v) : l.splice(i, 1)}else e.situe[d.situe] = d.v;sauver();rendre();return}
   if(d.fiche){ouvrirFiche(d.fiche);return}
+  if(d.chrono){lancerChrono(d.chrono);return}
   if(d.poster){ouvrirPoster(d.poster);return}
   if(d.ech){ouvrirEchauf(d.ech);return}
   if(d.test){ouvrirTest(d.test);return}
