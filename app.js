@@ -341,7 +341,8 @@ function ouvrirEchauf(id){
 }
 function vueFiches(){
   const ids = Object.keys(FICHES);
-  return `<h2>📖 Fiches d'exercice</h2>
+  return `<h2>🎯 Les 3 mobiles</h2><section class="carte"><p class="small muted">Touche une affiche pour voir le tableau complet : %, séries, répétitions, récupération, sensation attendue.</p><div class="mob-choix">${MOBILES_ORDRE.map(m => `<button type="button" style="--mc:${MOBILES[m].coul}" data-act="mobiles"><img src="${MOB_IMG[m]}" alt=""><span>${MOBILES[m].nom}</span></button>`).join('')}</div></section>
+   <h2>📖 Fiches d'exercice</h2>
    ${[['haut','💪 Haut du corps'],['tronc','🧱 Tronc'],['bas','🦵 Bas du corps']].map(([z, t]) => {
      const l = ids.filter(id => (atelier(id) || {}).zone === z).sort((x, y) => atelier(x).groupe.localeCompare(atelier(y).groupe, 'fr') || FICHES[x].localeCompare(FICHES[y], 'fr'));
      const tr = z === 'tronc' ? ['gainage','gainlat','crunch','crunch_inv','deadbug','birddog','mclimb','taps','rtwist'].filter(k => ECH_ITEM[k]) : [];
