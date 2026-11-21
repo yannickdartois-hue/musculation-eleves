@@ -62,7 +62,7 @@ function ouvrir(o){
       <div class="chm-bts"><button type="button" class="chm-mini" data-c="son">${libMode()}</button><button type="button" class="chm-mini" data-c="quitter">✕</button></div></div>`;
     const pastilles = `<div class="chm-series">${Array.from({length:N}, (_, i) => `<span class="${i + 1 < serie || phase === 'fini' || (phase === 'repos' && i + 1 === serie) ? 'ok' : i + 1 === serie || (phase === 'repos' && i === serie) ? 'ici' : ''}">${i + 1}</span>`).join('')}</div>`;
     let corps = '';
-    if(phase === 'prep')corps = `<p class="chm-etat">Prêt ? Série ${serie}</p><div class="chm-temps chm-gros">${affTemps()}</div>`;
+    if(phase === 'prep')corps = `<p class="chm-etat">Prêt ? Série ${serie}</p><div class="chm-temps chm-gros">${affTemps()}</div>${o.approche && serie === 1 ? `<p class="chm-consigne">🔸 Série d'approche avant : ${esc(o.approche)}</p>` : ''}`;
     else if(phase === 'serie')corps = `<p class="chm-etat serie">Série ${serie} / ${N} · ${o.temps ? esc(txt(o.reps)) + ' s' : esc(txt(o.reps)) + ' répétitions'}</p>
       <div class="chm-temps">${affTemps()}</div>${o.temps ? '<div class="chm-barre"><i></i></div>' : ''}
       <img class="chm-img" src="${esc(o.img || '')}" alt="" onerror="this.remove()">
@@ -131,9 +131,10 @@ function binome(P, opts){
     if(fini(i))return `<section class="chb-m fin"><div class="chb-l"><b>${esc(p.prenom)}</b> · ✓ TERMINÉ</div><p>${esc(p.nom)} : ${N[i]} séries faites.${!fini(o) ? ` Tu restes coach de ${esc(autre.prenom)} jusqu'à la fin.` : ''}</p>${!fini(o) ? coach(i) : ''}</section>`;
     if(travail){
       const prep = now < debut, attente = !prep ? reposRestant(i) : 0;
-      if(prep)return `<section class="chb-m prep"><div class="chb-l"><b>${esc(p.prenom)}</b> · ⏳ PRÊT ?</div><div class="chb-t">${Math.max(1, Math.ceil((debut - now) / 1000))}</div>${pills}<p>${esc(p.nom)} · ${esc(p.chargeTxt || '')}</p></section>`;
-      if(fini(o) && attente > 0 && !s.force)return `<section class="chb-m rep"><div class="chb-l"><b>${esc(p.prenom)}</b> · ⏸ REPOS</div>${pills}<div class="chb-t">${mmss(attente)}</div><p class="chb-rec">${esc(autre.prenom)} a fini : tu enchaînes seul(e) après ta récupération.</p><button type="button" class="chb-bt" data-b="go">Je repars quand même</button></section>`;
-      const e = (now - Math.max(debut, s.go || debut, fini(o) && !s.force && s.repos ? s.repos + p.recupS * 1000 : 0)) / 1000;
+      if(prep)return `<section class="chb-m prep"><div class="chb-l"><b>${esc(p.prenom)}</b> · ⏳ PRÊT ?</div><div class="chb-t">${Math.max(1, Math.ceil((debut - now) / 1000))}</div>${pills}<p>${esc(p.nom)} · ${esc(p.chargeTxt || '')}${p.approche ? '<br>Série d\'approche faite ? ' + esc(p.approche) : ''}</p></section>`;
+      const attend = attente > 0 && !s.force && s.repos != null && (p.bloque || fini(o));
+      if(attend)return `<section class="chb-m rep"><div class="chb-l"><b>${esc(p.prenom)}</b> · ⏸ REPOS</div>${pills}<div class="chb-t">${mmss(attente)}</div><p class="chb-rec">${p.bloque ? `Récupération obligatoire en ${esc(p.mobNom || '')} : tu repars au bip.` : `${esc(autre.prenom)} a fini : tu enchaînes seul(e) après ta récupération.`}</p>${p.bloque ? '' : '<button type="button" class="chb-bt" data-b="go">Je repars quand même</button>'}</section>`;
+      const e = (now - Math.max(debut, s.go || debut, (p.bloque || fini(o)) && !s.force && s.repos ? s.repos + p.recupS * 1000 : 0)) / 1000;
       return `<section class="chb-m trav"><div class="chb-l"><b>${esc(p.prenom)}</b> · 💪 TRAVAIL</div>${pills}
         <div class="chb-ligne"><img src="${esc(p.img || '')}" alt="" onerror="this.remove()"><div><div class="chb-t">${p.temps ? mmss(nb(p.reps) - e) : mmss(e)}</div>
         <p><b>Série ${s.faites + 1}/${N[i]}</b> · ${esc(String(nb(p.reps)))} ${p.temps ? 's' : 'rép.'}${p.chargeTxt ? ' · ' + esc(p.chargeTxt) : ''}<br>${esc(p.nom)}</p></div></div>

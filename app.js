@@ -206,8 +206,13 @@ function prevuTexte(a, p){
   parts.push(`<span>récup <b>${m.recup}</b></span>`);
   if(a.type === 'charge')parts.push(p.charge ? `<span><b>${fmtKg(p.charge.charge)}</b> ${esc(p.charge.unite)} · ${p.pct} %</span>` : `<span>⚠️ pas de charge max</span>`);
   else if(a.niveaux)parts.push(`<span>niveau <b>${p.niv + 1}</b> : ${esc(a.niveaux[p.niv])}</span>`);
-  return `<div class="prevu">${parts.join('')}</div>${p.charge ? `<p class="compo">${esc(p.charge.compo)}</p>` : ''}`;
+  const ap = approche(a, p);
+  return `<div class="prevu">${parts.join('')}</div>${p.charge ? `<p class="compo">${esc(p.charge.compo)}</p>` : ''}${ap ? `<p class="approche">🔸 Série d'approche : <b>${ap.txt}</b> <span class="small muted">${esc(ap.compo)}</span></p>` : ''}`;
 }
+/* v5.1 : vocabulaire « niveau » pour les ateliers sans charge (saut sur box) */
+function varianteTxt(at, t){return atelier(at).type === 'variante' ? String(t).replace(/Couple suivant \(\+ lourd\)/, 'Niveau suivant').replace(/Couple précédent \(\+ léger\)/, 'Niveau précédent').replace(/la charge/g, 'le niveau').replace(/de charge/g, 'de niveau').replace(/charge/g, 'niveau') : t}
+/* v5.1 : série d'approche à environ 50 % de la charge de travail, 8 répétitions */
+function approche(a, p){if(!p || a.type !== 'charge' || !p.charge)return null;const r = chargeReelle(a.support, p.charge.charge * 0.5);return r ? {txt:fmtKg(r.charge) + ' × 8', compo:r.compo} : null}
 
 /* ================== Ressentis ================== */
 function vocab(e){
@@ -282,9 +287,10 @@ function carteEchauffement(s1){   // v3.0 : échauffement guidé en 5 parties, c
      <button type="button" class="wpart-min" data-wtim="${x.min * 60}" aria-label="Minuteur ${x.min} min">⏱ ${x.min}′</button>
      <details class="wdet"${OUV_ECH.has(x.k) ? ' open' : ''} data-wdet="${x.k}"><summary>Voir le détail${x.compte ? ' · ' + x.compte(has) : ''}</summary>${x.intro ? `<p class="small muted">${esc(x.intro)}</p>` : ''}<div class="wgrid">${x.l.map(id => typeof id === 'string' ? carte(id, (x.star || []).includes(id)) : id.html).join('')}</div></details></div>`}).join('');
   return `<section class="carte"><h3>🔥 Notre échauffement · ${faites}/${P.length}</h3>
-   <p class="small muted">Environ 18 min, à faire à deux : une coche vaut pour le binôme. Touche une partie quand elle est faite, ou coche les exercices dans « Voir le détail ».</p>
+   <p class="small muted">Environ 12 min, à faire à deux : une coche vaut pour le binôme. Touche une partie quand elle est faite, ou coche les exercices dans « Voir le détail ».</p>
    <div class="wtimer" id="wtimer"${WT ? '' : ' hidden'}><span id="wtt">0:00</span><button type="button" class="bt mini" data-wta="stop">Arrêter</button></div>
    ${parts}
+   <p class="small muted">Renforcement au poids du corps (pompes, gainage, abdominaux) : facultatif, voir l'onglet 📖 Fiches.</p>
    <div class="rangee" style="margin-top:8px"><button type="button" class="bt mini" data-act="pouls">❤️ Prendre mon pouls</button>${ech.pouls ? `<b>${ech.pouls} puls/min</b>` : ''}</div>
    ${n <= 3 ? `<h4>${s1 ? 'Après 2-3 min de course' : 'Début d\'échauffement'} : note et mot</h4>${ressentiHTML('ech.debut', ech.debut)}<h4>Fin d'échauffement : note et mot</h4>${ressentiHTML('ech.fin', ech.fin)}` : ''}</section>`;
 }
@@ -294,7 +300,7 @@ const ACTIV_POUR = {act_scap:['dc','dch','rowh','rowb','pullover'], act_y:['oise
 function exosDuJour(n){const e = EL();if(n === SEANCE_EVAL)return tirageDe(e);if(n >= SEANCE_PROJET)return jourDe(e, SEANCE);if(n >= 4)return B.listes[SEANCE] || LISTES_DEFAUT[SEANCE] || [];return []}
 function partiesEch(n){
   const jour = exosDuJour(n), nb = (has, l) => l.filter(has).length;
-  const cardio = ['corde','jjack','genoux','talons','chasses','squatjack','burpee','fente_m','chenille','ours','crabe'];
+  const cardio = ['corde','jjack','genoux','talons','chasses','squatjack','burpee','fente_m','chenille','ours','crabe'];   // v5.1 : 2 au choix, renforcement facultatif
   const mob = ['mob_cheville','mob_genou','mob_hanche','mob_buste','mob_epaule','mob_poignet'];
   const act = ['act_scap','act_y','act_pont','act_gm','act_fente','act_squat'];
   const star = act.filter(k => ACTIV_POUR[k].some(a => jour.includes(a)));
@@ -302,14 +308,13 @@ function partiesEch(n){
   const puiss = SEANCE === 'S6' || (n >= SEANCE_PROJET && EL().projet && EL().projet.mob === 'puiss');
   if(puiss)renf.unshift('sjump');
   const P = [
-   {k:'P1', t:'1 · Cardio', min:5, r:'Course ou corde à sauter, puis 4 exercices au choix', intro:'Jusqu\'à la sensation de chaleur et un léger essoufflement.', l:cardio, compte:h => nb(h, cardio) + ' / 4 au choix', ok:h => h('P1') || nb(h, cardio) >= 4},
+   {k:'P1', t:'1 · Cardio', min:3, r:'Course ou corde à sauter, puis 2 exercices au choix', intro:'Jusqu\'à la sensation de chaleur et un léger essoufflement.' + (puiss ? ' Séance Puissance : le squat jump en mise en route.' : ''), l:(puiss ? ['sjump'] : []).concat(cardio), star:puiss ? ['sjump'] : [], compte:h => nb(h, cardio.concat('sjump')) + ' / 2 au choix', ok:h => h('P1') || nb(h, cardio.concat('sjump')) >= 2},
    {k:'P2', t:'2 · Articulaire', min:2, r:'Chevilles, genoux, hanches, buste, épaules, poignets', intro:'Dans cet ordre, de bas en haut : 10 cercles dans chaque sens.', l:mob, compte:h => nb(h, mob) + ' / 6', ok:h => h('P2') || nb(h, mob) === mob.length},
-   {k:'P3', t:'3 · Activation', min:4, r:star.length ? '4 au choix : les ★ préparent tes exercices du jour' : '4 au choix, 10 répétitions lentes', intro:'Le placement des ateliers, sans charge.', l:act, star, compte:h => nb(h, act) + ' / 4 au choix', ok:h => h('P3') || nb(h, act) >= 4},
-   {k:'P4', t:'4 · Renforcement', min:4, r:'4 au choix, à ton niveau', intro:'Pompes : choisis ton niveau, du mur aux pompes classiques.' + (puiss ? ' Séance Puissance : le squat jump en plus.' : ''), l:renf, compte:h => nb(h, renf) + ' / 4 au choix', ok:h => h('P4') || nb(h, renf) >= 4}];
+   {k:'P3', t:'3 · Activation', min:3, r:star.length ? '4 au choix : les ★ préparent tes exercices du jour' : '4 au choix, 10 répétitions lentes', intro:'Le placement des ateliers, sans charge.', l:act, star, compte:h => nb(h, act) + ' / 4 au choix', ok:h => h('P3') || nb(h, act) >= 4}];
   if(n >= 4 && jour.length){const sp = jour.map(at => 'sp:' + at);
-    P.push({k:'P5', t:'5 · Spécifique', min:3, r:'1 série de 10 sans charge de chaque exercice du jour', intro:'En soignant le placement : c\'est le geste de ta série, sans le poids.', compte:h => nb(h, sp) + ' / ' + sp.length, ok:h => h('P5') || nb(h, sp) === sp.length,
-      l:jour.map(at => {const a = atelier(at);return {html:`<button type="button" class="wcard${(sea(EL(), SEANCE).ech || {}).wc && sea(EL(), SEANCE).ech.wc.includes('sp:' + at) ? ' on' : ''}" data-wc="sp:${at}"><img src="${imgAtelier(at) || ''}" alt="" loading="lazy"><b>${esc(a.nom)}</b><span>${esc(POINT_CLE[at] || '')}</span></button>`}})});}
-  else if(n === 2 || n === 3)P.push({k:'P5', t:'5 · Spécifique', min:3, r:'1 série de 10 sans charge des ateliers que tu vas tester', l:[], ok:h => h('P5')});
+    P.push({k:'P5', t:'4 · Spécifique', min:3, r:'La série d\'approche de chaque exercice du jour', intro:'Environ 50 % de ta charge de travail, 8 répétitions, en soignant le placement.', compte:h => nb(h, sp) + ' / ' + sp.length, ok:h => h('P5') || nb(h, sp) === sp.length,
+      l:jour.map(at => {const a = atelier(at);return {html:`<button type="button" class="wcard${(sea(EL(), SEANCE).ech || {}).wc && sea(EL(), SEANCE).ech.wc.includes('sp:' + at) ? ' on' : ''}" data-wc="sp:${at}"><img src="${imgAtelier(at) || ''}" alt="" loading="lazy"><b>${esc(a.nom)}</b><span>${(() => {const ap = approche(a, prevuDe(EL(), SEANCE, at));return ap ? '🔸 ' + esc(ap.txt) : esc(POINT_CLE[at] || '')})()}</span></button>`}})});}
+  else if(n === 2 || n === 3)P.push({k:'P5', t:'4 · Spécifique', min:3, r:'1 série de 10 sans charge des ateliers que tu vas tester', l:[], ok:h => h('P5')});
   return P;
 }
 /* minuteur d'une partie de l'échauffement */
@@ -405,7 +410,7 @@ function lancerBinome(){
   const E2 = B.e.slice(0, 2), ats = [$('cb0').value, $('cb1').value];fermerFen();
   const P = E2.map((e, i) => {const at = ats[i], a = atelier(at), p = prevuDe(e, SEANCE, at) || {}, M = MOBILES[p.mob] || {};
     const ch = p.charge && p.charge.charge ? fmtKg(p.charge.charge) : (a.niveaux && p.niv != null ? 'Niv. ' + (p.niv + 1) : '');
-    return {prenom:prenom(e.nom), nom:a.nom, img:imgAtelier(at), mob:p.mob, series:p.series || 3, reps:p.reps || 10, temps:!!a.temps, chargeTxt:ch, recupS:M.recupS || 90, cle:POINT_CLE[at] || ''}});
+    const ap = approche(a, p);return {prenom:prenom(e.nom), nom:a.nom, img:imgAtelier(at), mob:p.mob, mobNom:M.nom, bloque:p.mob === 'volume' || p.mob === 'puiss', approche:ap ? ap.txt : '', series:p.series || 3, reps:p.reps || 10, temps:!!a.temps, chargeTxt:ch, recupS:M.recupS || 90, cle:POINT_CLE[at] || ''}});
   MinuteurM.binome(P, {onFin:r => {
     E2.forEach((e, i) => {const at = ats[i], s = sea(e, SEANCE);s.exos = s.exos || {};const x = s.exos[at] = s.exos[at] || {}, p = prevuDe(e, SEANCE, at);
       if(r.faites[i] > 0)x.real = {series:r.faites[i], reps:p ? p.reps : 10, charge:p && p.charge ? p.charge.charge : null, niv:p ? p.niv : null, diff:!!(p && r.faites[i] !== p.series)};
@@ -418,7 +423,7 @@ function lancerChrono(at){
   const M = MOBILES[p.mob] || {}, aut = autre();
   const ch = p.charge && p.charge.charge ? fmtKg(p.charge.charge) : (a.type === 'variante' && a.niveaux && p.niv != null ? 'Niv. ' + (p.niv + 1) : '');
   MinuteurM.ouvrir({at, nom:a.nom, img:imgAtelier(at), mob:p.mob, mobNom:M.nom, series:p.series, reps:p.reps, temps:!!a.temps, chargeTxt:ch,
-    recupS:M.recupS || 90, cle:POINT_CLE[at] || '', crit:a.crit || [], signes:SIGNES, partenaire:aut ? prenom(aut.nom) : '',
+    recupS:M.recupS || 90, approche:(approche(a, p) || {}).txt || '', cle:POINT_CLE[at] || '', crit:a.crit || [], signes:SIGNES, partenaire:aut ? prenom(aut.nom) : '',
     onFait:() => {const b = document.createElement('button');b.type = 'button';b.dataset.fait = at;b.hidden = true;document.body.appendChild(b);b.click();b.remove()}});
 }
 /* v2.6 : fiches d'exercice complètes et répertoire de l'échauffement */
@@ -607,7 +612,7 @@ function carteExo(at, estCle){
   else{
     h += `<p class="small">✓ Réalisé : ${ex.real.series} séries × ${ex.real.reps}${a.temps ? ' s' : ' rép.'}${ex.real.charge ? ' à ' + fmtKg(ex.real.charge) : ''}${ex.real.diff ? ' <b>(différent du prévu)</b>' : ''} <button type="button" class="lien" data-modif="${at}">modifier</button></p>`;
     if(p && p.mob === 'puiss')h += `<div class="rangee"><button type="button" class="bt mini${ex.vit ? ' danger' : ''}" data-vit="${at}">⚡ ${ex.vit ? 'La vitesse a baissé (noté)' : 'La vitesse a baissé avant la fin'}</button></div>`;
-    if(n >= 4)h += carteMoi(at, ex, p);
+    if(n >= 4)h += carteMoi(at, ex, p, estCle);
     else h += `<h4>Mon ressenti</h4>${ressentiHTML('exos.' + at + '.ressenti', r, true)}${coh ? `<p class="retour ${coh.stop ? 'stop' : coh.ok ? 'ok' : 'non'}">${esc(coh.msg)}</p>` : ''}`;
     if(fini)h += `<button type="button" class="lien" data-replier="${at}">Replier la fiche</button>`;
   }
@@ -615,10 +620,11 @@ function carteExo(at, estCle){
 }
 function niveauCoach(){return NIV_COACH_M[SEANCE] || 1}
 function coachFini(ex, estCle){const av = ex.avis || {}, niv = niveauCoach();
+  if(!estCle)return !!av.cle;   // v5.1 : hors exercice clé, le point clé suffit
   return !!(av.cle && av.conseil && (!estCle || niv < 2 || av.propres != null) && (!estCle || niv < 3 || (av.obj && av.obj.k && av.obj.v !== '' && av.obj.v != null)))}
 function ficheFinie(ex, p, aut, estCle){
   const nx = ex.next || {}, av = ex.avis || {}, niv = niveauCoach();
-  const moi = ex.ressenti && ex.ressenti.note && ex.rir && nx.c && (nx.ok !== false || (nx.pq || '').trim());
+  const moi = ex.ressenti && ex.ressenti.note && ex.rir && (!estCle || (nx.c && (nx.ok !== false || (nx.pq || '').trim())));
   const coach = !aut || coachFini(ex, estCle);
   return !!(moi && coach);
 }
@@ -634,15 +640,16 @@ function rappelPrec(at, ex){
   return `<div class="rappel">${av.conseil ? `<p class="small"><b>${esc(qui)}</b> t'avait conseillé (${pr.S}) : « ${esc(av.conseil)} »</p>` : ''}${o ? `<p class="small">🎯 Objectif : <b>${esc(lib)} ${esc(String(o.v))}</b>${tenu == null ? '' : tenu ? ' · <b class="okc">tenu ✓</b>' : ' · pas tenu'}</p>` : ''}
    ${av.conseil && ex.real ? `<div class="rangee"><span class="small">Ce conseil t'a aidé ?</span><span class="chips">${[['1','oui'],['0','non']].map(([v, t]) => `<button type="button" class="${ex.aide === v ? 'ici' : ''}" data-aide="${at}" data-v="${v}">${t}</button>`).join('')}</span></div>` : ''}</div>`;
 }
-function carteMoi(at, ex, p){
+function carteMoi(at, ex, p, estCle){
   const e = EL(), r = ex.ressenti || {}, nx = ex.next || {}, coh = ex.coh, sens = p ? sensSuite(p.mob, ex) : null;
   const prop = p && sens != null ? ajuster(p.mob, p, sens) : null, ok = nx.c ? choixCoherent(sens, nx.c) : null;
   return `<div class="bcm moi"><h4><span>✎</span> Fin de l'exercice · ${esc(prenom(e.nom))} écrit</h4>
    ${ressentiHTML('exos.' + at + '.ressenti', r, true, true)}${coh && coh.stop ? `<p class="retour stop">⛔ ${esc(coh.msg)}</p>` : ''}
    <p class="bti">Combien aurais-tu pu en faire encore, propres ?</p><div class="seg">${RIR_Q.map(([k, t]) => `<button type="button" class="${ex.rir === k ? 'ici' : ''}" data-rir="${at}" data-v="${k}">${t}</button>`).join('')}</div>
    ${(() => {const sg = suggestionRM(e, at, ex, p);return sg ? `<div class="rappel"><p class="small">📈 <b>Ta charge max semble avoir monté</b> : ${sg.reps} rép. à ${fmtKg(sg.charge)} avec de la réserve, soit environ <b>${fmtKg(sg.cm)} → ${fmtKg(sg.est)}</b>. Les charges prévues monteront.</p><div class="rangee"><button type="button" class="bt mini ok" data-majrm="${at}">Mettre à jour</button><button type="button" class="bt mini" data-nonrm="${at}">Non, pas sûr</button></div></div>` : ex.rmMaj ? `<p class="small okc">📈 Charge max mise à jour : ${fmtKg(ex.rmMaj)}.</p>` : ''})()}
-   <p class="bti">La prochaine fois, je…</p><div class="choix2">${NEXT_Q.map(([k, t]) => `<button type="button" class="${nx.c === k ? 'ici' : ''}" data-next="${at}" data-v="${k}">${esc(t)}</button>`).join('')}</div>
-   ${nx.c && prop ? `<p class="retour ${ok === false ? 'non' : 'ok'}">${ex.rir && p ? esc(msgReserve(p.mob, ex.rir)) + ' ' : ''}L'appli proposait : <b>${esc(prop.txt.replace(/\.$/, ''))}</b>. ${ok === false ? 'Ton choix est différent : dis pourquoi.' : 'Ton choix va dans le même sens ✓'}</p>
+   ${estCle ? '' : `<p class="small muted">Exercice simple : ressenti et réserve suffisent. L'analyse complète se fait sur ⭐ l'exercice clé.</p>`}
+   ${!estCle ? '' : `<p class="bti">La prochaine fois, je…</p><div class="choix2">${NEXT_Q.map(([k, t]) => `<button type="button" class="${nx.c === k ? 'ici' : ''}" data-next="${at}" data-v="${k}">${esc(varianteTxt(at, t))}</button>`).join('')}</div>`}
+   ${estCle && nx.c && prop ? `<p class="retour ${ok === false ? 'non' : 'ok'}">${ex.rir && p ? esc(msgReserve(p.mob, ex.rir)) + ' ' : ''}L'appli proposait : <b>${esc(varianteTxt(at, prop.txt.replace(/\.$/, '')))}</b>. ${ok === false ? 'Ton choix est différent : dis pourquoi.' : 'Ton choix va dans le même sens ✓'}</p>
      <input type="text" class="pq" maxlength="160" data-pq="${at}" value="${esc(nx.pq || '')}" placeholder="${ok === false ? 'Pourquoi ? ex. le dos s\'arrondissait à la fin' : 'Pourquoi (facultatif)'}">` : ''}</div>`;
 }
 function carteCoachM(at, ex, p, a, aut, estCle){
@@ -651,9 +658,9 @@ function carteCoachM(at, ex, p, a, aut, estCle){
   const monte = ex.next && ['serie', 'reps', 'chargeP'].includes(ex.next.c), defaut = av.cle === '0' || nS;
   return `<div class="bcm coach"><h4><span>⏱</span> Pendant les séries · ${esc(prenom(aut.nom))} coache ${P_}</h4><p class="small muted">Niveau ${niv} : ${['', 'je constate', 'je compte', 'je fixe un objectif'][niv]}${niv > 1 ? estCle ? ' · ⭐ exercice clé' : ` · <button type="button" class="lien" data-excle="${at}">⭐ en faire l'exercice clé</button>` : ''}</p>
    <p class="bti">Point clé : ${esc(pc)}</p><div class="seg deux">${[['1','✓ Tenu'],['0','À revoir']].map(([v, t]) => `<button type="button" class="${av.cle === v ? 'ici' + (v === '0' ? ' rouge' : '') : ''}" data-clevu="${at}" data-v="${v}">${t}</button>`).join('')}</div>
-   <details class="sig"${nS ? ' open' : ''}><summary>▸ Signes de fatigue${nS ? ` <b>(${nS})</b>` : ''}</summary><div class="chips">${SIGNES.map(sg => `<button type="button" class="${(av.signes || []).includes(sg) ? 'ici' : ''}" data-signe="${esc(sg)}" data-at="${at}">${esc(sg)}</button>`).join('')}</div></details>
+   ${!estCle ? `<p class="small muted">Hors exercice clé : le point clé suffit (tu peux aussi le cocher dans le chrono binôme).</p>` : ''}${!estCle ? '' : `<details class="sig"${nS ? ' open' : ''}><summary>▸ Signes de fatigue${nS ? ` <b>(${nS})</b>` : ''}</summary><div class="chips">${SIGNES.map(sg => `<button type="button" class="${(av.signes || []).includes(sg) ? 'ici' : ''}" data-signe="${esc(sg)}" data-at="${at}">${esc(sg)}</button>`).join('')}</div></details>
    ${niv >= 2 && estCle ? `<p class="bti">Répétitions propres, dernière série</p><div class="pas"><button type="button" data-propres="${at}" data-d="-1" aria-label="moins">−</button><b>${av.propres != null ? av.propres : '–'}</b><span>/ ${pr}</span><button type="button" data-propres="${at}" data-d="1" aria-label="plus">+</button></div>` : ''}
-   <p class="bti">Ton conseil</p><div class="chips">${conseilsPour(ex).map(c => `<button type="button" class="${av.conseil === c ? 'ici' : ''}" data-conseil="${esc(c)}" data-at="${at}">${esc(c)}</button>`).join('')}</div>
+   <p class="bti">Ton conseil</p><div class="chips">${conseilsPour(ex).map(c => `<button type="button" class="${av.conseil === c ? 'ici' : ''}" data-conseil="${esc(c)}" data-at="${at}">${esc(c)}</button>`).join('')}</div>`}
    ${niv >= 3 && estCle ? `<p class="bti">Objectif pour ${P_} la prochaine fois</p><div class="seg">${objL.map(([k, t]) => `<button type="button" class="${av.obj && av.obj.k === k ? 'ici' : ''}" data-objk="${at}" data-v="${k}">${t.replace(' (kg)', '')}</button>`).join('')}</div>
      ${av.obj && av.obj.k ? `<input type="number" inputmode="decimal" data-objv="${at}" value="${esc(av.obj.v != null ? String(av.obj.v) : '')}" placeholder="${(OBJ_M.find(z => z[0] === av.obj.k) || [])[1]}" style="max-width:160px;margin-top:6px">` : ''}` : ''}
    ${defaut && monte ? `<p class="retour non">⚠️ ${esc(prenom(aut.nom))} a vu un défaut, et ${P_} veut augmenter : corrige d'abord la posture.</p>` : ''}</div>`;
@@ -742,7 +749,7 @@ function carteAfl(){
 function vueCharges(){
   const e = EL(), ats = ATELIERS.filter(a => a.menu), nb = ats.filter(a => e.rm[a.id]).length;
   return `<h2>Mes charges max · ${esc(prenom(e.nom))}</h2><p class="retour ${nb >= OBJ_TESTS[0] ? 'ok' : 'non'}"><b>${nb} / ${ats.length}</b> charges max · objectif ${OBJ_TESTS[0]} à ${OBJ_TESTS[1]} à la fin de la S3. Un atelier sans charge max ne peut pas entrer dans ton projet.</p>
-   <section class="carte"><p class="small">${rmVerrou(e) ? '🔒 <b>Évaluation en cours (S9)</b> : les charges max ne bougent plus.' : 'Tu as progressé ? Touche <b>Modifier</b> avec une série réussie proprement (3 à 10 répétitions). L\'ancienne valeur reste dans l\'historique.'}</p><table class="tb"><tr><th>Atelier</th><th>Charge max</th><th></th></tr>${ats.map(a => {const r = e.rm[a.id], h = r && r.hist && r.hist.length ? r.hist : null;return `<tr><td>${esc(a.nom)} <span class="small muted">${esc(a.groupe)}</span>${imgAtelier(a.id) ? `<br><img class="ch-vign" src="${imgAtelier(a.id)}" alt="" loading="lazy">` : ''}</td><td>${r ? `${h ? `<span class="small muted">${h.map(x => fmtKg(x.cm)).join(' → ')} →</span> ` : ''}<b>${fmtKg(r.cm)}</b>${h && r.cm > h[0].cm ? ` <b class="okc">+${Math.round(100 * (r.cm / h[0].cm - 1))} %</b>` : ''}<br><span class="small muted">${esc(MODE_RM[r.mode] || r.mode)} · ${esc(r.date)}</span>` : '—'}</td><td><button type="button" class="bt mini" data-calc="${a.id}"${r ? '' : ' disabled'}>%</button> <button type="button" class="bt mini" data-direct="${a.id}"${rmVerrou(e) ? ' disabled' : ''}>${r ? 'Modifier' : '✏️ Saisir'}</button></td></tr>`}).join('')}</table></section>
+   <section class="carte"><p class="small">${rmVerrou(e) ? '🔒 <b>Évaluation en cours (S9)</b> : les charges max ne bougent plus.' : 'Tu as progressé ? Touche <b>Modifier</b> avec une série réussie proprement (3 à 10 répétitions). L\'ancienne valeur reste dans l\'historique.'}</p><p class="small">ℹ️ <b>Charge max estimée</b> : ce n'est pas le poids que tu peux soulever une fois, c'est une estimation (± 10 %) calculée à partir de ta meilleure série de 3 à 10 répétitions. Elle sert à calculer tes charges. <b>Ne la vérifie jamais.</b></p><table class="tb"><tr><th>Atelier</th><th>Charge max estimée</th><th></th></tr>${ats.map(a => {const r = e.rm[a.id], h = r && r.hist && r.hist.length ? r.hist : null;return `<tr><td>${esc(a.nom)} <span class="small muted">${esc(a.groupe)}</span>${imgAtelier(a.id) ? `<br><img class="ch-vign" src="${imgAtelier(a.id)}" alt="" loading="lazy">` : ''}</td><td>${r ? `${h ? `<span class="small muted">${h.map(x => fmtKg(x.cm)).join(' → ')} →</span> ` : ''}<b>${fmtKg(r.cm)}</b>${h && r.cm > h[0].cm ? ` <b class="okc">+${Math.round(100 * (r.cm / h[0].cm - 1))} %</b>` : ''}<br><span class="small muted">${esc(MODE_RM[r.mode] || r.mode)} · ${esc(r.date)}</span>` : '—'}</td><td><button type="button" class="bt mini" data-calc="${a.id}"${r ? '' : ' disabled'}>%</button> <button type="button" class="bt mini" data-direct="${a.id}"${rmVerrou(e) ? ' disabled' : ''}>${r ? 'Modifier' : '✏️ Saisir'}</button></td></tr>`}).join('')}</table></section>
    <section class="carte info calc-pub"><h3>🧮 Calculette</h3><p class="small">① Ta charge max → la charge à mettre pour chaque pourcentage, disques compris.<br>② Une série (tant de kilos × tant de répétitions) → ta charge max.</p><button type="button" class="bt act pleine" data-act="calcLibre">Ouvrir la calculette</button></section>`;
 }
 function tableauCharges(sup, cm){
@@ -770,11 +777,11 @@ function rendreCalc(){
     const ch = num(CALC.ch), rp = +CALC.rp, cm = ch && brzycki(ch, rp);
     corps = `<div class="calc-serie"><div><label class="ch">Charge soulevée (kg)</label><input class="calc-gros" type="number" inputmode="decimal" id="cCh" value="${CALC.ch}" placeholder="ex. 20"></div>
       <div><label class="ch">Répétitions réussies</label><div class="calc-pas"><button type="button" data-crp="-1">−</button><b>${rp}</b><button type="button" data-crp="1">+</button></div></div></div>
-      <div class="calc-res">${cm ? `<span>Ta charge max estimée</span><b>${fmtKg(cm)}</b><small>${fmtKg(ch)} × ${rp} rép. → ${fmtKg(ch)} × 36 ÷ (37 − ${rp})</small><button type="button" class="bt act" data-act="calcUtiliser" data-cm="${cm}">Voir mes charges à chaque % →</button>` : `<span>Entre une charge et 3 à 10 répétitions</span>`}</div>
+      <div class="calc-res">${cm ? `<span>Ta charge max estimée (± 10 %)</span><b>${fmtKg(cm)}</b><small>${fmtKg(ch)} × ${rp} rép. → ${fmtKg(ch)} × 36 ÷ (37 − ${rp})</small><button type="button" class="bt act" data-act="calcUtiliser" data-cm="${cm}">Voir mes charges à chaque % →</button>` : `<span>Entre une charge et 3 à 10 répétitions</span>`}</div>
       <p class="small muted">Plus la série est courte (3 à 6 répétitions), plus l'estimation est juste. Au-delà de 10, elle n'est plus fiable.</p>`;
   } else {
     const cm = num(CALC.cm), p = +CALC.p, r = cm > 0 ? chargeReelle(CALC.sup, cm * p / 100) : null, mob = MOBILES_ORDRE.filter(k => p >= MOBILES[k].pct[0] && p <= MOBILES[k].pct[1]);
-    corps = `<label class="ch">Ma charge max (kg)</label><input class="calc-gros" type="number" inputmode="decimal" id="cCm" value="${CALC.cm}" placeholder="ex. 30">
+    corps = `<label class="ch">Ma charge max estimée (kg)</label><input class="calc-gros" type="number" inputmode="decimal" id="cCm" value="${CALC.cm}" placeholder="ex. 30">
       ${cm > 0 ? `<div class="calc-res" id="cRes"><span>À <b>${p} %</b>${mob.length ? ' · ' + mob.map(k => `<i style="background:${MOBILES[k].coul}">${MOBILES[k].nom}</i>`).join(' ') : ''}</span><b>${r ? fmtKg(r.charge) : '—'}</b>${r ? `<small>${esc(r.compo)}</small>` : ''}</div>
       <input type="range" id="cP" min="30" max="85" step="5" value="${p}" class="calc-curseur" aria-label="Pourcentage">
       <div class="calc-grille">${[40,50,55,60,65,70,75,80].map(q => {const x = chargeReelle(CALC.sup, cm * q / 100), mb = MOBILES_ORDRE.filter(k => q >= MOBILES[k].pct[0] && q <= MOBILES[k].pct[1]);
