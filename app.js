@@ -31,7 +31,6 @@ const ONGLETS = [['seance','🏋️','Séance'],['charges','⚖️','Charges'],[
 const SEANCES_IDS = SEANCES.map(s => s.id);
 /* v2.0 : S2-S3 tests, S4 tonification, S5 volume, S6 puissance et choix, S7 projet, S8-S9 évaluation */
 const MOBILE_DU_JOUR = {S4:'tonif', S5:'volume', S6:'puiss'};
-const LISTES_DEFAUT = {S4:['dch','rowh','dm','squath','fentes','hip'], S5:['dch','rowb','squath','sdtj'], S6:['dch','rowh','squath','hip']};
 const SEANCE_PROJET = 7, SEANCE_MOBILE = [4, 6];
 /* ateliers proposés pour un mobile : le menu (charges), et en Puissance seulement les 6 ateliers poussés vite */
 const dispoPour = mob => ATELIERS.filter(a => a.plio ? mob === 'puiss' : a.menu && (mob !== 'puiss' || a.puissance));   // v2.5 : saut sur box, Puissance seulement
