@@ -41,7 +41,7 @@ const MOBILE_DU_JOUR = {S4:'tonif', S5:'volume', S6:'puiss'};
 const SEANCE_PROJET = 7, SEANCE_MOBILE = [4, 6];
 /* ateliers proposés pour un mobile : le menu (charges), et en Puissance seulement les 6 ateliers poussés vite */
 const dispoPour = mob => ATELIERS.filter(a => a.plio ? mob === 'puiss' : a.menu && (mob !== 'puiss' || a.puissance));   // v2.5 : saut sur box, Puissance seulement
-const DEF_PARAM = {tonif:{pct:55, series:3, reps:15}, volume:{pct:70, series:4, reps:10}, puiss:{pct:45, series:4, reps:5}};
+const DEF_PARAM = {tonif:{pct:50, series:3, reps:20}, volume:{pct:65, series:4, reps:12}, puiss:{pct:45, series:4, reps:5}};   // v4.1 : 1er couple (2e en Puissance)
 const TEMPS = {tonif:'30 à 45 s', volume:'40 à 60 s', puiss:'15 s'};
 const FORME = [[1,'😫','Très fatigué'],[2,'😕','Fatigué'],[3,'😐','Normal'],[4,'🙂','En forme'],[5,'😀','Très en forme']];
 
@@ -643,8 +643,7 @@ function choisirSuite(at, v){
     const m = MOBILES[pr.mob] || {}, b = (k, d) => Math.min(m[k][1], Math.max(m[k][0], px[k] + d));nx.avant = Object.assign({}, px);
     if(nx.c === 'serie')px.series = b('series', 1);
     if(nx.c === 'reps')px.reps = b('reps', 2);
-    if(nx.c === 'chargeP')px.pct = b('pct', 5);
-    if(nx.c === 'chargeM')px.pct = b('pct', -5);
+    if(nx.c === 'chargeP' || nx.c === 'chargeM'){const c = m.couples, i = Math.min(c.length - 1, Math.max(0, coupleIdx(pr.mob, px.pct) + (nx.c === 'chargeP' ? 1 : -1)));px.pct = c[i][0];if(!atelier(at).temps)px.reps = c[i][1]}
     e.ajust = e.ajust || [];e.ajust.push({S:SEANCE, at, txt:(NEXT_Q.find(q => q[0] === nx.c) || [])[1], pourquoi:nx.pq || '', date:jour()});
   }
   sauver();rendre();
@@ -741,7 +740,8 @@ function vueProjet(){
    <div class="mob-bandeau"><img src="${MOB_IMG[pr.mob]}" alt=""><span>Mon mobile : ${esc(m.nom)} · ${esc(m.theme)}</span></div>
    <section class="carte"><p>Mobile : <b style="color:${m.coul}">${m.nom}</b> (${m.theme}) · ${m.pct[0]}-${m.pct[1]} % · ${m.series[0]}-${m.series[1]} séries · ${m.reps[0]}-${m.reps[1]} rép. · récup ${m.recup}</p><button type="button" class="lien" data-act="changerMobile">changer de mobile</button></section>
    ${pr.exos.map((x, i) => {const a = atelier(x.at);return `<div class="ex"><header><b>${i + 1}. ${esc(a.nom)}</b><button type="button" class="bt mini danger" data-retirer="${i}">Retirer</button></header><p class="small muted">${esc(a.groupe)} · ${a.zone}</p>
-     <div class="rangee">${pasHTML(i, 'series', x.series, 'séries')}${a.temps ? '' : pasHTML(i, 'reps', x.reps, 'rép.')}${a.type === 'charge' ? pasHTML(i, 'pct', x.pct, '%') : ''}</div>
+     <div class="rangee">${pasHTML(i, 'series', x.series, 'séries')}${a.temps || a.type === 'charge' ? '' : pasHTML(i, 'reps', x.reps, 'rép.')}</div>
+     ${a.type === 'charge' ? `<div class="chips couples">${m.couples.map((c, k) => `<button type="button" class="${x.pct === c[0] && x.reps === c[1] ? 'ici' : ''}" data-couple="${i}" data-k="${k}">${k + 1}) ${coupleTxt(c)}</button>`).join('')}</div>${m.couples.some(c => x.pct === c[0] && x.reps === c[1]) ? '' : `<p class="small muted">Actuellement ${x.pct} % × ${x.reps} : choisis un couple.</p>`}` : ''}
      ${a.niveaux ? `<div class="chips">${a.niveaux.map((t, k) => `<button type="button" class="${x.niv === k ? 'ici' : ''}" data-pniv="${i}" data-k="${k}" title="${esc(t)}">Niv. ${k + 1}</button>`).join('')}</div>` : ''}</div>`}).join('')}
    <section class="carte"><label class="ch" for="ajEx">Ajouter un exercice</label><select id="ajEx"><option value="">—</option>${['haut', 'bas'].map(z => `<optgroup label="${z === 'haut' ? 'Haut du corps' : 'Bas du corps'}">${dispo.filter(a => a.zone === z).map(a => `<option value="${a.id}">${esc(a.nom)}</option>`).join('')}</optgroup>`).join('')}</select></section>
    <section class="carte ${ctrl.every(c => c[0]) ? 'info' : ''}"><h3>Vérification</h3>${ctrl.map(([ok, t]) => `<p class="small">${ok ? '✅' : '⚠️'} ${esc(t)}</p>`).join('')}</section>
@@ -880,6 +880,7 @@ document.addEventListener('click', async ev => {
   if(d.calc){calcAtelier(d.calc);return}
   if(d.nouveauProjet){const m = d.nouveauProjet, dp = DEF_PARAM[m];EL().projet = {mob:m, exos:[], cree:jour()};sauver();rendre();return}
   if(d.retirer != null){EL().projet.exos.splice(+d.retirer, 1);sauver();rendre();return}
+  if(d.couple != null){const pr = EL().projet, x = pr.exos[+d.couple], c = MOBILES[pr.mob].couples[+d.k];x.pct = c[0];x.reps = c[1];sauver();rendre();return}
   if(d.pas != null){const pr = EL().projet, x = pr.exos[+d.pas], k = d.k, [lo, hi] = bornes(pr.mob, k), step = k === 'pct' ? 5 : k === 'reps' ? 1 : 1;
     x[k] = Math.max(lo, Math.min(hi, x[k] + step * +d.d));sauver();rendre();return}
   if(d.pniv != null){EL().projet.exos[+d.pniv].niv = +d.k;sauver();rendre();return}
