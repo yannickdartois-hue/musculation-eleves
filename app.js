@@ -294,7 +294,7 @@ function vueFiches(){
   const ids = Object.keys(FICHES);
   return `<h2>📖 Fiches d'exercice</h2>
    <section class="carte"><h3>Les ateliers</h3><p class="small muted">Touche une fiche pour l'ouvrir.</p><div class="fiches-grille">${ids.map(id => `<button type="button" class="fiche-vig" data-poster="${id}"><img src="${imgAtelier(id) || ficheImg(id)}" alt="" loading="lazy"><span>${esc(FICHES[id])}</span></button>`).join('')}</div>
-   <p class="small muted">Développé couché haltères, pull-over et oiseau : fiche en préparation (voir la fiche de l'atelier dans la séance).</p></section>
+   <p class="small muted">Oiseau : fiche en préparation (voir la fiche de l'atelier dans la séance).</p></section>
    <h2>🔥 Échauffement</h2>${ECHAUF_LIB.map(g => `<section class="carte"><h3>${esc(g.t)}</h3><p class="small muted">${esc(g.i)}</p><div class="ech-liste">${g.l.map(([id, nom, txt]) => `<button type="button" class="ech-it" data-ech="${id}"><img src="${imgEchauf(id)}" alt="" loading="lazy"><span><b>${esc(nom)}</b><br><span class="small">${esc(txt)}</span></span></button>`).join('')}</div></section>`).join('')}`;
 }
 function ficheAtelier(a){
