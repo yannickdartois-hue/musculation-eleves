@@ -342,7 +342,11 @@ function ouvrirEchauf(id){
 function vueFiches(){
   const ids = Object.keys(FICHES);
   return `<h2>📖 Fiches d'exercice</h2>
-   <section class="carte"><h3>Les ateliers</h3><p class="small muted">Touche une fiche pour l'ouvrir.</p><div class="fiches-grille">${ids.map(id => `<button type="button" class="fiche-vig" data-poster="${id}"><img src="${imgAtelier(id) || ficheImg(id)}" alt="" loading="lazy"><span>${esc(FICHES[id])}</span></button>`).join('')}</div></section>
+   ${[['haut','💪 Haut du corps'],['tronc','🧱 Tronc'],['bas','🦵 Bas du corps']].map(([z, t]) => {
+     const l = ids.filter(id => (atelier(id) || {}).zone === z).sort((x, y) => atelier(x).groupe.localeCompare(atelier(y).groupe, 'fr') || FICHES[x].localeCompare(FICHES[y], 'fr'));
+     const tr = z === 'tronc' ? ['gainage','gainlat','crunch','crunch_inv','deadbug','birddog','mclimb','taps','rtwist'].filter(k => ECH_ITEM[k]) : [];
+     return `<section class="carte"><h3>${t}</h3>${l.length ? `<div class="fiches-grille">${l.map(id => `<button type="button" class="fiche-vig" data-poster="${id}"><img src="${imgAtelier(id) || ficheImg(id)}" alt="" loading="lazy"><span>${esc(FICHES[id])}</span><small class="muted">${esc(atelier(id).groupe)}</small></button>`).join('')}</div>` : ''}
+      ${tr.length ? `<p class="small muted">Pas d'atelier à charge pour le tronc : abdominaux et gainage au poids du corps.</p><div class="fiches-grille">${tr.map(k => `<button type="button" class="fiche-vig" data-ech="${k}"><img src="${imgEchauf(k)}" alt="" loading="lazy"><span>${esc(ECH_ITEM[k][1])}</span><small class="muted">Abdominaux</small></button>`).join('')}</div>` : ''}</section>`}).join('')}
    <h2>🔥 Échauffement</h2>${ECHAUF_LIB.map(g => `<section class="carte"><h3>${esc(g.t)}</h3><p class="small muted">${esc(g.i)}</p><div class="ech-liste">${g.l.map(([id, nom, txt]) => `<button type="button" class="ech-it" data-ech="${id}"><img src="${imgEchauf(id)}" alt="" loading="lazy"><span><b>${esc(nom)}</b><br><span class="small">${esc(txt)}</span></span></button>`).join('')}</div></section>`).join('')}`;
 }
 function ficheAtelier(a){
