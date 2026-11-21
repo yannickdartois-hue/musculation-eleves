@@ -218,7 +218,7 @@ html.chrono-ouvert body{overflow:hidden}
 .wpart-bt{display:flex;gap:10px;align-items:center;text-align:left;border:0;background:none;font:inherit;color:inherit;padding:2px;cursor:pointer}
 .wpart-c{width:30px;height:30px;flex:none;border-radius:50%;border:2px solid #94a3b8;display:grid;place-items:center;font-weight:800;color:#fff}
 .wpart.on .wpart-c{background:#16a34a;border-color:#16a34a}
-.wpart-min{border:1px solid var(--trait);background:#f8fafc;border-radius:10px;padding:8px 10px;font:inherit;font-weight:700;font-size:14px}
+.wpart-min{min-height:48px;border:1px solid var(--trait);background:#f8fafc;border-radius:10px;padding:8px 10px;font:inherit;font-weight:700;font-size:14px}
 .wdet{grid-column:1/-1}.wdet summary{cursor:pointer;font-size:14px;font-weight:700;color:#4d7c0f}
 .wgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-top:8px}
 .wcard{display:flex;flex-direction:column;gap:3px;align-items:stretch;text-align:left;border:2px solid var(--trait);border-radius:12px;background:#fff;padding:6px;font:inherit;font-size:13px;color:inherit;cursor:pointer}
@@ -293,6 +293,46 @@ html.chrono-ouvert body{overflow:hidden}
 .alerte-c{border:2px solid #b42318;background:#fde8e6}
 .chip-niv{display:inline-block;padding:8px 12px;border-radius:999px;border:2px solid var(--trait);font-weight:700;font-size:14px;background:#fff}.chip-niv.ici{border-color:#1e40af;background:#dbeafe}
 .mob-choix button.bloque{opacity:.55;filter:grayscale(.6)}
+/* ===== v6.0 : séquences repliables, bilan, 10 RM, absences ===== */
+.seg.trois{grid-template-columns:repeat(3,1fr)}
+.titre-fiche{flex:1;border:0;background:none;padding:6px 0;min-height:48px;text-align:left;font:800 21px/1.1 var(--d);font-stretch:80%;color:var(--encre);text-decoration:underline dotted 2px;text-underline-offset:4px;cursor:pointer}
+h3 .titre-fiche{font-size:inherit;min-height:0}
+.statut{flex:none;font-size:15px;font-weight:800;border-radius:999px;padding:4px 10px;border:2px solid currentColor;white-space:nowrap}
+.st-ok{color:#14532d;background:var(--ok-pale)}.st-faire{color:#334155;background:#fff}.st-ratt{color:#7c2d12;background:var(--attention-pale)}.st-cours{color:#1e3a8a;background:#e0e7ff}
+.abs-l{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:6px 0 10px}.abs-l span{font-weight:700;color:var(--repere);font-size:15px}
+.abs-l button{min-height:48px;padding:0 14px;border-radius:24px;border:2px dashed var(--trait);background:var(--craie);font-weight:700;color:var(--encre)}
+.abs-l button.ici{border-style:solid;border-color:var(--alerte);background:var(--alerte-pale);color:#7f1d1d}
+.puces button.abs{border-style:dashed;color:#7f1d1d}
+.protocole summary{font-weight:800;min-height:48px;display:flex;align-items:center;cursor:pointer}.protocole ol li{margin:6px 0}
+.deja{margin-top:10px}.deja summary{font-weight:700;min-height:48px;display:flex;align-items:center;cursor:pointer}
+.ratt{justify-content:space-between;border-top:1px solid #f3b4ad;padding:6px 0}.ratt b{flex:1}
+.detail-ch{display:flex;flex-wrap:wrap;justify-content:center;gap:6px 14px;margin:6px 0;font-size:16px}.detail-ch span{background:var(--act-pale);border-radius:10px;padding:4px 10px}
+.disq{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:6px 0}
+.disq button{min-height:52px;border-radius:12px;border:2px solid var(--trait);background:#fff;font:800 18px var(--d);color:var(--encre)}
+.disq button.moins{border-color:#fca5a5;color:#991b1b}.disq button.plus{border-color:#86efac;color:#14532d}
+.charge-grande.petite{font-size:34px}
+.seq-prog{display:flex;align-items:center;gap:10px;margin:8px 0;font-weight:700;font-size:15px;color:var(--repere)}
+.seq-barre{flex:1;height:10px;border-radius:5px;background:var(--trait);overflow:hidden}.seq-barre i{display:block;height:100%;background:var(--ok)}
+.seq{border:2px solid var(--trait);border-radius:16px;margin:10px 0;background:var(--craie);overflow:hidden}
+.seq.st-fini{border-color:var(--ok)}.seq.ouv{border-color:var(--act);box-shadow:0 2px 10px rgba(0,0,0,.06)}
+.seq-tete{width:100%;display:flex;align-items:center;gap:12px;border:0;background:none;padding:12px 14px;min-height:64px;text-align:left;font:inherit;color:inherit;cursor:pointer}
+.seq.ouv .seq-tete{background:var(--act-pale)}
+.seq-n{flex:none;width:40px;height:40px;border-radius:50%;display:grid;place-items:center;font:900 19px var(--d);border:2px solid var(--encre);background:#fff}
+.seq.st-fini .seq-n{background:var(--ok);border-color:var(--ok);color:#fff}.seq.ouv .seq-n{background:var(--act);border-color:var(--act);color:#fff}
+.seq-t{flex:1;display:flex;flex-direction:column;gap:2px}.seq-t b{font:800 19px/1.15 var(--d)}.seq-t small{font-size:15px;font-weight:700;color:var(--repere)}
+.seq.st-fini .seq-t small{color:#14532d}.seq-ch{font-size:22px;color:var(--repere)}
+.seq-corps{padding:4px 12px 14px}
+.seq-obj,.seq-faire{margin:8px 0;font-size:16px}.seq-obj{background:var(--act-pale);border-radius:12px;padding:8px 10px}
+.seq-fin{border-top:2px dashed var(--trait);margin-top:14px;padding-top:10px}
+.seq-bt{min-height:56px;font-size:18px;font-weight:900}.seq-bt:disabled{opacity:1;background:#e2e8f0;border-color:#cbd5e1;color:#475569}
+.bil-bloc{margin:14px 0 0;font:900 15px var(--d);letter-spacing:.08em;color:var(--act-fonce)}
+.carte.bilan input[type=text]{width:100%}
+.tb-defil{overflow-x:auto}
+.renf summary{font-weight:700}
+.chb-rap{background:rgba(0,0,0,.22);border-radius:10px;padding:6px 10px;margin:0;font-size:16px}
+.chb-charge{font-size:18px;margin:2px 0}.chb-charge span{font-size:16px;opacity:.95}
+.chb-tr{display:flex;align-items:center;gap:8px;font-size:15px}.chb-tr button{min-width:56px;min-height:48px;border-radius:10px;border:2px solid rgba(255,255,255,.7);background:transparent;color:#fff;font:inherit;font-weight:800}
+.chb-m.prep .chb-bt{color:#9a3412}.chb-bt:disabled{background:rgba(255,255,255,.55);color:#3f3f46}
 </style>
 <style>/* Lisibilité terrain : textes à 15 px minimum à l'écran ; tailles d'origine à l'impression. */@media print{:root{--fs-min:0px}}</style>
 <link rel="stylesheet" href="eps-charte-v1.css">

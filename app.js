@@ -60,8 +60,15 @@ async function empreinte(id, code){
 }
 
 /* ================== Rendu général ================== */
+/* v6.0 : après une action, l'élément touché reste au même endroit de l'écran (plus de saut en haut de page) */
+let ANCRE = null;
+function selAncre(el){if(el.id)return '#' + CSS.escape(el.id);
+  const a = [...el.attributes].filter(x => x.name.startsWith('data-')).map(x => `[${x.name}="${CSS.escape(x.value)}"]`).join('');
+  return a ? el.tagName.toLowerCase() + a : null}
 function rendre(){
-  const y = window.scrollY;
+  const y = window.scrollY, main = $('main');let anc = null;
+  try{if(ANCRE && main.contains(ANCRE)){const sel = selAncre(ANCRE);if(sel)anc = {sel, top:ANCRE.getBoundingClientRect().top}}}catch(e){}
+  ANCRE = null;
   if(!B){$('nav').hidden = true;$('btMob').hidden = true;$('sous').textContent = 'Lycée Georges Pompidou · CA5 Terminale';$('main').innerHTML = FICHES_LIBRES ? `<button type="button" class="bt" data-act="fichesRetour" style="margin:4px 0 10px">← Retour</button>` + vueFiches() : accueil();return}
   $('sous').textContent = (B.classe ? B.classe + ' · ' : '') + B.e.map(x => prenom(x.nom)).join(' & ');
   $('nav').hidden = false;$('btMob').hidden = false;
@@ -69,18 +76,22 @@ function rendre(){
   const qui = `<div class="qui"><span>Qui pratique ?</span>${B.e.map((x, i) => `<button type="button" data-qui="${i}" class="${i === P ? 'ici' : ''}">${esc(prenom(x.nom))}</button>`).join('')}</div>`;
   const demo = DEMO ? `<div class="demo-bandeau"><span>👀 <b>Mode démo</b> : rien n'est enregistré.</span><button type="button" class="bt mini" data-act="quitterDemo">Quitter</button></div>` : '';
   const corps = {seance:vueSeance, charges:vueCharges, projet:vueProjet, carnet:vueCarnet, fiches:vueFiches, envoyer:vueEnvoyer}[ONGLET]();
-  $('main').innerHTML = demo + `<p class="onglet-aide">${AIDE_ONGLET[ONGLET] || ''}</p>` + (ONGLET === 'envoyer' || ONGLET === 'fiches' ? '' : qui) + corps;
+  main.style.minHeight = main.offsetHeight + 'px';
+  main.innerHTML = demo + `<p class="onglet-aide">${AIDE_ONGLET[ONGLET] || ''}</p>` + (ONGLET === 'envoyer' || ONGLET === 'fiches' ? '' : qui) + corps;
   window.scrollTo(0, y);
+  if(anc){try{const n = main.querySelector(anc.sel);if(n){const d = n.getBoundingClientRect().top - anc.top;if(Math.abs(d) > 1)window.scrollBy(0, d)}}catch(e){}}
+  main.style.minHeight = '';
 }
 
 /* ================== Accueil ================== */
 function accueil(){
   const l = Object.values(CARNETS).sort((a, b) => (b.maj || 0) - (a.maj || 0));
   return `<h2>Mon carnet de musculation</h2>
-  ${l.length ? `<section class="carte"><h3>Carnets sur ce téléphone</h3>${l.map(c => `<button type="button" class="bt pleine" style="margin:6px 0;justify-content:flex-start" data-ouvrir="${c.id}">🔒 ${esc(c.e.map(x => x.nom).join(' & '))}${c.classe ? ` <span class="muted small">· ${esc(c.classe)}</span>` : ''}</button>`).join('')}</section>` : ''}
+  ${l.length ? `<section class="carte"><h3>Carnets sur ce téléphone</h3>${l.map(c => `<button type="button" class="bt pleine" style="margin:6px 0;justify-content:flex-start" data-carnet="${c.id}">🔒 ${esc(c.e.map(x => x.nom).join(' & '))}${c.classe ? ` <span class="muted small">· ${esc(c.classe)}</span>` : ''}</button>`).join('')}</section>` : ''}
   <section class="carte"><h3>📖 Fiches d'exercice</h3><p class="small muted">Les fiches des ateliers et le répertoire de l'échauffement, en libre consultation.</p><button type="button" class="bt pleine" data-act="fichesLibres">Voir les fiches</button></section>
   <section class="carte"><h3>📷 QR de la classe</h3><p class="small muted">Scanne le QR affiché par le professeur : il donne la liste de la classe${Object.keys(CLASSES).length ? ' (classe' + (Object.keys(CLASSES).length > 1 ? 's' : '') + ' reçue' + (Object.keys(CLASSES).length > 1 ? 's' : '') + ' : ' + esc(Object.keys(CLASSES).join(', ')) + ')' : ''} et ouvre la séance du jour.</p><button type="button" class="bt act" data-act="scanClasse">📷 Scanner le QR de la classe</button></section>
   <section class="carte act"><h3>＋ Nouveau binôme</h3>${blocNouveau()}</section>
+  <section class="carte"><h3>📥 Récupérer un carnet</h3><p class="small muted">Changement de téléphone : choisis le fichier .json téléchargé depuis l'onglet « Au prof ». Rien n'est écrasé sans ton accord.</p><button type="button" class="bt" data-act="importer">📥 Choisir le fichier du carnet</button></section>
   <section class="carte"><h3>👀 Découvrir l'appli</h3><p class="small muted">Un binôme fictif déjà rempli, pour voir tous les écrans. Rien n'est enregistré.</p><button type="button" class="bt" data-act="demo">Essayer l'appli (démo)</button></section>
   <section class="carte info"><h3>Sans carnet</h3><div class="rangee"><button type="button" class="bt mini" data-act="mobiles">📋 Les 3 mobiles</button><button type="button" class="bt mini" data-act="calcLibre">🧮 Calculette</button></div></section>`;
 }
@@ -251,26 +262,115 @@ function apresRessenti(cle){
 }
 
 /* ================== Vue : séance ================== */
+/* v6.0 : la séance est découpée en séquences repliables (modèle de l'appli demi-fond) :
+   une seule ouverte à la fois, elle se replie quand l'élève la termine et la suivante s'ouvre.
+   Chaque élève a sa propre progression (seances[S].seq). */
 function vueSeance(){
-  const s = seanceById(SEANCE), e = EL();
-  const puces = `<div class="puces">${SEANCES_IDS.map(S => {const f = e.seances[S] && Object.keys(e.seances[S]).length;return `<button type="button" data-seance="${S}" class="${S === SEANCE ? 'ici' : ''}${f ? ' fait' : ''}">${S}</button>`}).join('')}</div>`;
-  let h = puces + `<div class="rangee" style="justify-content:flex-end"><button type="button" class="bt mini" data-act="scanClasse" data-libre>📷 QR de la classe</button></div><h2>${SEANCE} · ${esc(s.titre)}</h2><p class="muted small">${esc(s.obj)}</p>`;
-  const n = +SEANCE.slice(1);
-  if(n >= 4)h += carteForme();
-  h += carteEchauffement(n === 1);
-  if(n === 1)h += carteCircuit() + carteSitue() + carteQRMots();
-  if(n === 2 || n === 3)h += carteTest() + carteDefi() + carteQRMots();
-  if(n >= SEANCE_MOBILE[0] && n <= SEANCE_MOBILE[1])h += carteMobile(MOBILE_DU_JOUR[SEANCE]) + (n === 6 ? carteNiveauPuiss() : '') + carteReglesListe() + listeExos(LISTES_DEFAUT[SEANCE]) ;
-  if(n >= 4 && n <= 8)h += carteAfl();   // v2.1 : l'évaluation AFL2 et AFL3 commence en S4 (v5.0 : jusqu'à la S8)
-  if(n === SEANCE_MOBILE[1])h += carteEchelle();
-  if(n === SEANCE_PROJET)h += carteComparer();
-  if(n >= SEANCE_PROJET){
-    const pr = e.projet;
-    if(!pr || !pr.exos.length)h += `<section class="carte act"><h3>🎯 Construis d'abord ton projet</h3><p>${e.choix && e.choix.mob ? '' : 'Choisis ton mobile ci-dessus, puis '}3 à 6 exercices, haut et bas du corps.</p><button type="button" class="bt act" data-onglet="projet">Construire mon projet</button></section>`;
-    else if(n === SEANCE_EVAL){const t = tirageDe(e);h += carteMobile(pr.mob) + carteTirage(e) + (t.length ? listeExos(t, true) : '') + carteAnalyse()}
-    else h += carteMobile(pr.mob) + carteJour(e) + listeExos(jourDe(e, SEANCE), true) + (sea(e, SEANCE).ajust && Object.keys(sea(e, SEANCE).ajust).length ? carteAjustements() : '') + carteAnalyse();
-  }
+  const s = seanceById(SEANCE), e = EL(), n = +SEANCE.slice(1);
+  const puces = `<div class="puces">${SEANCES_IDS.map(S => {const f = e.seances[S] && Object.keys(e.seances[S]).length;return `<button type="button" data-seance="${S}" class="${S === SEANCE ? 'ici' : ''}${f ? ' fait' : ''}${absent(e, S) ? ' abs' : ''}"${absent(e, S) ? ' title="absent(e)"' : ''}>${S}</button>`}).join('')}</div>`;
+  let h = puces + `<div class="rangee" style="justify-content:flex-end"><button type="button" class="bt mini" data-act="scanClasse" data-libre>📷 QR de la classe</button></div><h2>${SEANCE} · ${esc(s.titre)}</h2><p class="muted small">${esc(s.obj)}</p>` + carteAbsence();
+  const L = sequences(n), sq = etatSeq(e, SEANCE), ouv = seqOuverte(L, sq);
+  const faitesN = L.filter(x => sq.fini[x.k]).length;
+  h += `<div class="seq-prog" aria-label="progression"><span>Séquences terminées : ${faitesN} / ${L.length}</span><span class="seq-barre"><i style="width:${Math.round(faitesN / L.length * 100)}%"></i></span></div>`;
+  L.forEach((x, i) => {
+    const fini = !!sq.fini[x.k], ouvert = x.k === ouv, st = fini ? ['fini', '✓ Terminé'] : ouvert || (x.commence && x.commence()) ? ['cours', '◐ En cours'] : ['faire', '○ À réaliser'];
+    h += `<section class="seq st-${st[0]}${ouvert ? ' ouv' : ''}" id="seq-${x.k}"><button type="button" class="seq-tete" data-seq="${x.k}" aria-expanded="${ouvert}"><span class="seq-n">${fini ? '✓' : i + 1}</span><span class="seq-t"><b>Séquence ${i + 1} · ${esc(x.t)}</b><small>${st[1]}</small></span><span class="seq-ch" aria-hidden="true">${ouvert ? '▴' : '▾'}</span></button>`;
+    if(ouvert){
+      const b = x.bouton ? x.bouton() : {txt:'Séquence terminée', ok:true};
+      h += `<div class="seq-corps"><p class="seq-obj">🎯 <b>Objectif :</b> ${esc(x.obj)}</p><p class="seq-faire">👉 ${x.faire}</p>${x.corps()}
+       <div class="seq-fin"><p class="small"><b>Pour valider :</b> ${esc(x.valid)}</p>${fini ? `<p class="retour ok">✓ Séquence terminée. Tu peux encore corriger ce qu'elle contient.</p>` : `<button type="button" class="bt ${b.ok ? 'ok' : ''} pleine seq-bt" data-seqfin="${x.k}"${b.bloque ? ' disabled' : ''}${b.conf ? ` data-conf="${esc(b.conf)}"` : ''}>${b.txt}</button>${b.aide ? `<p class="small muted">${b.aide}</p>` : ''}`}</div></div>`;
+    }
+    h += '</section>';
+  });
   return h;
+}
+function etatSeq(e, S){const s = sea(e, S);s.seq = s.seq || {fini:{}};s.seq.fini = s.seq.fini || {};return s.seq}
+function seqOuverte(L, sq){if(sq.ouv !== undefined && (sq.ouv === '' || L.some(x => x.k === sq.ouv)))return sq.ouv;const x = L.find(z => !sq.fini[z.k]);return x ? x.k : ''}
+function exosFaits(ids){const ex = sea(EL(), SEANCE).exos || {};return ids.filter(at => ex[at] && ex[at].real).length}
+function boutonEntrainement(ids){
+  const f = exosFaits(ids), r = ids.length - f;
+  return r <= 0 ? {txt:'✓ J\'ai fini mes exercices', ok:true} : {txt:`Terminer quand même (${r} exercice${r > 1 ? 's' : ''} non fait${r > 1 ? 's' : ''})`, conf:`${r} exercice(s) ne sont pas notés comme faits. Terminer quand même ?`, aide:'Coche « Fait comme prévu » ou lance le chrono sur chaque exercice.'};
+}
+function sequences(n){
+  const e = EL(), S = SEANCE, L = [];
+  /* Séquence 1 : échauffement (toutes les séances) */
+  L.push({k:'ech', t:'Je prépare mon corps à l\'effort', obj:'Élever la température du corps, mobiliser les articulations et activer les muscles du jour pour travailler en sécurité.',
+    faire:'Fais les 4 étapes dans l\'ordre et coche chacune quand elle est faite. Chacun coche sur son profil (« Qui pratique ? »).',
+    valid:'les 4 étapes cochées, dont le gainage obligatoire. Le bouton s\'active alors.', commence:() => ((sea(e, S).ech || {}).wc || []).length > 0,
+    corps:() => (n >= 4 ? carteForme() : '') + carteEchauffement(n === 1),
+    bouton:() => {const P_ = partiesEch(n), wc = (sea(e, S).ech || {}).wc || [], has = k => wc.includes(k), f = P_.filter(x => x.ok(has)).length;
+      return f === P_.length ? {txt:'✓ TERMINER L\'ÉCHAUFFEMENT', ok:true} : {txt:`TERMINER L'ÉCHAUFFEMENT (${f} / ${P_.length})`, bloque:true, aide:'Coche d\'abord les 4 étapes.'}}});
+  if(n === 1){
+    L.push({k:'circuit', t:'Je découvre les ateliers', obj:'Découvrir les 14 ateliers et leur placement, sans charge lourde.', faire:'Fais le circuit avec ton binôme : lis la fiche (image ou titre), fais l\'atelier, coche-le. Puis réponds à « Je me situe ».',
+      valid:'le circuit et « Je me situe » remplis.', corps:() => carteCircuit() + carteSitue(), commence:() => Object.keys(sea(e, 'S1').circuit || {}).length > 0});
+    L.push({k:'fin', t:'Je fais le point', obj:'Partager tes mots avec la classe.', faire:'Montre le QR de fin de séance au professeur.', valid:'QR montré au professeur.', corps:() => carteQRMots()});
+  }
+  if(n === 2 || n === 3){
+    L.push({k:'test', t:'Je détermine mes charges de référence (10 RM)', obj:'Trouver, pour chaque atelier, la charge que tu soulèves 10 fois proprement : elle sert à calculer toutes tes charges ensuite.',
+      faire:`Lis le mode d'emploi, puis fais 4 à 5 tests aujourd'hui${n === 3 ? ' : seuls les ateliers qu\'il te reste sont proposés' : ''}. Ton partenaire compte et juge.`,
+      valid:'tes tests du jour enregistrés. Un test non fait reste « à rattraper » plus tard.', corps:() => carteTest(), commence:() => Object.values(e.rm).some(r => r.S === S),
+      bouton:() => ({txt:'✓ J\'ai fini mes tests du jour', ok:true})});
+    L.push({k:'fin', t:'Défi par équipes et mots de la séance', obj:'Additionner vos kilos pour votre équipe et partager vos mots.', faire:'Choisissez votre équipe, puis montrez le QR au professeur.', valid:'QR montré au professeur.', corps:() => carteDefi() + carteQRMots()});
+  }
+  if(n >= SEANCE_MOBILE[0] && n <= SEANCE_MOBILE[1]){
+    const mob = MOBILE_DU_JOUR[S], ids = listeDe(S);
+    L.push({k:'train', t:`Je m'entraîne · ${MOBILES[mob].nom}`, obj:`Découvrir le mobile ${MOBILES[mob].nom} (${MOBILES[mob].theme.toLowerCase()}) et ressentir ses effets.`,
+      faire:'Vérifie tes charges, lance le chrono (binôme ou séries), puis note ton ressenti après chaque exercice. Ton partenaire coache.',
+      valid:'chaque exercice noté comme fait, ressenti rempli.', commence:() => exosFaits(ids) > 0,
+      corps:() => carteMobile(mob) + (n === 6 ? carteNiveauPuiss() : '') + carteReglesListe() + carteRattrapage(ids) + listeExos(LISTES_DEFAUT[S]),
+      bouton:() => boutonEntrainement(ids)});
+  }
+  if(n === SEANCE_PROJET)L.push({k:'choix', t:'Je choisis mon mobile et je construis mon projet', obj:'Choisir un mobile en t\'appuyant sur tes ressentis des S4 à S6, et construire ton programme.',
+    faire:'Compare les 3 mobiles, choisis le tien et explique pourquoi, puis construis ton projet (3 à 6 exercices) dans l\'onglet Projet.', valid:'mobile choisi et projet construit (3 exercices au moins).',
+    corps:() => carteComparer() + (e.projet && e.projet.exos.length ? `<p class="retour ok">Projet construit : ${e.projet.exos.length} exercices. <button type="button" class="lien" data-onglet="projet">le voir</button></p>` : `<button type="button" class="bt act pleine" data-onglet="projet">🎯 Construire mon projet</button>`),
+    commence:() => !!(e.choix && e.choix.mob), bouton:() => e.projet && e.projet.exos.length >= 3 ? {txt:'✓ Mon projet est prêt', ok:true} : {txt:'Construis d\'abord ton projet (3 exercices au moins)', bloque:true}});
+  if(n >= SEANCE_PROJET && n < SEANCE_EVAL){
+    const pr = e.projet, ids = pr && pr.exos.length ? jourDe(e, S) : [];
+    L.push({k:'train', t:'Je m\'entraîne · mon projet', obj:'Réaliser ton programme et observer si tes sensations correspondent à ton mobile.', faire:'Choisis tes 3 exercices du jour, lance le chrono, note tes ressentis. Ton partenaire coache.',
+      valid:'tes 3 exercices notés comme faits.', commence:() => exosFaits(ids) > 0,
+      corps:() => !pr || !pr.exos.length ? `<section class="carte act"><h3>🎯 Construis d'abord ton projet</h3><p>3 à 6 exercices, haut et bas du corps.</p><button type="button" class="bt act" data-onglet="projet">Construire mon projet</button></section>`
+        : carteMobile(pr.mob) + carteJour(e) + carteRattrapage(ids) + listeExos(ids, true),
+      bouton:() => ids.length ? boutonEntrainement(ids) : {txt:'Construis d\'abord ton projet', bloque:true}});
+  }
+  if(n === SEANCE_EVAL){
+    const pr = e.projet, t = tirageDe(e);
+    L.push({k:'train', t:'Je réalise mon évaluation', obj:'Réaliser les 3 exercices tirés au sort avec les paramètres de ton projet.', faire:'Scanne le QR du tirage, puis réalise et note chaque exercice.', valid:'les 3 exercices tirés notés comme faits.',
+      commence:() => t.length > 0, corps:() => pr ? carteMobile(pr.mob) + carteTirage(e) + (t.length ? listeExos(t, true) : '') : `<p class="retour non">Pas de projet dans ce carnet.</p>`,
+      bouton:() => t.length ? boutonEntrainement(t) : {txt:'Scanne d\'abord le tirage', bloque:true}});
+  }
+  if(n >= SEANCE_MOBILE[0]){
+    L.push({k:'bilan', t:'Je fais mon bilan', obj:'Observer, analyser et réguler : savoir quoi changer la prochaine fois.',
+      faire:'Réponds en touchant les choix (30 secondes). C\'est ton bilan à toi, même en binôme.', valid:'les questions OBSERVER, ANALYSER et RÉGULER remplies.',
+      commence:() => !!sea(e, S).bilan,
+      corps:() => carteBilan() + (n >= SEANCE_PROJET && n < SEANCE_EVAL && sea(e, S).ajust && Object.keys(sea(e, S).ajust).length ? carteAjustements() : '') + (n >= SEANCE_PROJET ? carteAnalyse() : '') + (n === SEANCE_MOBILE[1] ? carteEchelle() : '') + (n >= 4 && n <= 8 ? carteAfl() : ''),
+      bouton:() => bilanComplet(e, S) ? {txt:'✓ Valider mon bilan', ok:true} : {txt:'Valider mon bilan', bloque:true, aide:'Réponds d\'abord à chaque question.'}});
+  }
+  return L;
+}
+/* ---------- v6.0 : bilan individuel (dès la S4) ---------- */
+const BILAN = [
+ ['OBSERVER', 'obj', 'Mon objectif de séance est-il atteint ?', [['oui','Oui'],['partiel','En partie'],['non','Non']]],
+ ['OBSERVER', 'cons', 'Ai-je respecté les consignes de mon mobile (répétitions, rythme, récupération) ?', [['oui','Oui'],['partiel','En partie'],['non','Non']]],
+ ['ANALYSER', 'vecu', 'Mon effort était…', [['facile','Trop facile'],['adapte','Adapté'],['dur','Difficile'],['trop','Trop difficile']]],
+ ['RÉGULER', 'reg', 'La prochaine fois, je…', [['garder','Garde tout pareil'],['plus','Augmente un peu'],['moins','Diminue'],['tech','Travaille d\'abord la technique']]],
+ ['RÉGULER', 'sur', '… sur quoi ?', [['charge','La charge'],['reps','Les répétitions'],['series','Les séries'],['recup','La récupération']]],
+ ['COACHING', 'role', 'Mon rôle pour mon partenaire aujourd\'hui', [['pareur','Pareur'],['obs','Observateur'],['coach','Coach']]]];
+const bilanLib = (k, v) => {const q = BILAN.find(x => x[1] === k);return q ? ((q[3].find(c => c[0] === v) || [])[1] || '') : ''};
+const bilanQs = (e, b) => BILAN.filter(q => (q[1] !== 'sur' || ['plus', 'moins'].includes(b.reg)) && (q[1] !== 'role' || B.e.length > 1));
+function bilanComplet(e, S){const b = (e.seances[S] || {}).bilan;return !!b && bilanQs(e, b).every(q => b[q[1]])}
+function carteBilan(){
+  const e = EL(), s = sea(e, SEANCE), b = s.bilan || {}, so = seanceById(SEANCE);
+  let blocPrec = '', h = '';
+  bilanQs(e, b).forEach(([bloc, k, q, ch]) => {
+    if(bloc !== blocPrec){h += `<p class="bil-bloc">${bloc}</p>`;blocPrec = bloc}
+    h += `<p class="bti">${esc(q)}</p><div class="seg${ch.length === 3 ? ' trois' : ''}">${ch.map(([v, t]) => `<button type="button" class="${b[k] === v ? 'ici' : ''}" data-bil="${k}" data-v="${v}" aria-pressed="${b[k] === v}">${esc(t)}</button>`).join('')}</div>`;
+  });
+  const inco = b.vecu === 'facile' && b.reg === 'moins' ? 'Trop facile, et tu diminues ? Vérifie ton choix.' : b.vecu === 'trop' && b.reg === 'plus' ? 'Trop difficile, et tu augmentes ? Pense d\'abord à la sécurité.' : '';
+  return `<section class="carte bilan"><h3>📝 Mon bilan · ${esc(prenom(e.nom))}</h3><p class="small muted">Objectif de la séance : ${esc(so.obj)}</p>${h}
+   ${inco ? `<p class="retour non">⚠️ ${esc(inco)}</p>` : ''}
+   <label class="ch" for="bilR">Ce que j'ai réussi (facultatif)</label><input type="text" id="bilR" data-biltxt="reussi" maxlength="90" value="${esc(b.reussi || '')}" placeholder="ex. dos droit sur toutes les séries">
+   <label class="ch" for="bilA">À améliorer la prochaine fois (facultatif)</label><input type="text" id="bilA" data-biltxt="ameliorer" maxlength="90" value="${esc(b.ameliorer || '')}" placeholder="ex. respecter la récupération">
+   ${bilanComplet(e, SEANCE) ? '<p class="retour ok">✓ Bilan complet.</p>' : ''}</section>`;
 }
 function carteForme(){
   const s = sea(EL(), SEANCE), n = +SEANCE.slice(1);
@@ -286,11 +386,13 @@ function carteEchauffement(s1){   // v3.0 : échauffement guidé en 5 parties, c
     return `<div class="wpart${ok ? ' on' : ''}"><button type="button" class="wpart-bt" data-wc="${x.k}" aria-pressed="${has(x.k)}"><span class="wpart-c">${ok ? '✓' : ''}</span><span><b>${esc(x.t)}</b><br><span class="small">${esc(x.r)}</span></span></button>
      <button type="button" class="wpart-min" data-wtim="${x.min * 60}" aria-label="Minuteur ${x.min} min">⏱ ${x.min}′</button>
      <details class="wdet"${OUV_ECH.has(x.k) ? ' open' : ''} data-wdet="${x.k}"><summary>Voir le détail${x.compte ? ' · ' + x.compte(has) : ''}</summary>${x.intro ? `<p class="small muted">${esc(x.intro)}</p>` : ''}<div class="wgrid">${x.l.map(id => typeof id === 'string' ? carte(id, (x.star || []).includes(id)) : id.html).join('')}</div></details></div>`}).join('');
-  return `<section class="carte"><h3>🔥 Notre échauffement · ${faites}/${P.length}</h3>
-   <p class="small muted">Environ 12 min, à faire à deux : une coche vaut pour le binôme. Touche une partie quand elle est faite, ou coche les exercices dans « Voir le détail ».</p>
+  const aut = autre(), renf = renfEch();
+  return `<section class="carte"><h3>🔥 Mon échauffement · ${esc(prenom(EL().nom))} · ${faites}/${P.length}</h3>
+   <p class="small muted">Environ 15 min. Touche une étape quand elle est faite, ou coche les exercices dans « Voir le détail ». Les coches sont à toi : ton partenaire coche sur son profil${aut ? `, ou touche « Copier pour ${esc(prenom(aut.nom))} » s'il a fait la même chose` : ''}.</p>
    <div class="wtimer" id="wtimer"${WT ? '' : ' hidden'}><span id="wtt">0:00</span><button type="button" class="bt mini" data-wta="stop">Arrêter</button></div>
    ${parts}
-   <p class="small muted">Renforcement au poids du corps (pompes, gainage, abdominaux) : facultatif, voir l'onglet 📖 Fiches.</p>
+   ${aut && wc.length ? `<button type="button" class="bt mini" data-act="copierEch">📋 Copier mes coches pour ${esc(prenom(aut.nom))}</button>` : ''}
+   <details class="wdet renf"${OUV_ECH.has('renf') ? ' open' : ''} data-wdet="renf"><summary>💪 Exercices au poids du corps (facultatifs)</summary><p class="small muted">Pompes, gainage, abdominaux : en complément, si tu as le temps. Ils ne comptent pas dans les 4 étapes.</p><div class="wgrid">${renf.map(id => carte(id)).join('')}</div></details>
    <div class="rangee" style="margin-top:8px"><button type="button" class="bt mini" data-act="pouls">❤️ Prendre mon pouls</button>${ech.pouls ? `<b>${ech.pouls} puls/min</b>` : ''}</div>
    ${n <= 3 ? `<h4>${s1 ? 'Après 2-3 min de course' : 'Début d\'échauffement'} : note et mot</h4>${ressentiHTML('ech.debut', ech.debut)}<h4>Fin d'échauffement : note et mot</h4>${ressentiHTML('ech.fin', ech.fin)}` : ''}</section>`;
 }
@@ -298,23 +400,23 @@ const ECH_ITEM = {};ECHAUF_LIB.forEach(g => g.l.forEach(x => {ECH_ITEM[x[0]] = x
 const OUV_ECH = new Set();
 const ACTIV_POUR = {act_scap:['dc','dch','rowh','rowb','pullover'], act_y:['oiseau','tirage','dm'], act_pont:['hip'], act_gm:['sdtj','rowb'], act_fente:['fentes','squath'], act_squat:['squath','sbox']};
 function exosDuJour(n){const e = EL();if(n === SEANCE_EVAL)return tirageDe(e);if(n >= SEANCE_PROJET)return jourDe(e, SEANCE);if(n >= 4)return B.listes[SEANCE] || LISTES_DEFAUT[SEANCE] || [];return []}
+function renfEch(){const l = ['squat','pompes_mur','pompes_step','pompes_genoux','pompes','dips','gainlat','crunch','crunch_inv','deadbug','birddog','mclimb','taps','rtwist'];
+  const n = +SEANCE.slice(1), puiss = SEANCE === 'S6' || (n >= SEANCE_PROJET && EL().projet && EL().projet.mob === 'puiss');if(puiss)l.unshift('sjump');return l.filter(id => ECH_ITEM[id])}
 function partiesEch(n){
   const jour = exosDuJour(n), nb = (has, l) => l.filter(has).length;
   const cardio = ['corde','jjack','genoux','talons','chasses','squatjack','burpee','fente_m','chenille','ours','crabe'];   // v5.1 : 2 au choix, renforcement facultatif
   const mob = ['mob_cheville','mob_genou','mob_hanche','mob_buste','mob_epaule','mob_poignet'];
   const act = ['act_scap','act_y','act_pont','act_gm','act_fente','act_squat'];
   const star = act.filter(k => ACTIV_POUR[k].some(a => jour.includes(a)));
-  const renf = ['squat','pompes_mur','pompes_step','pompes_genoux','pompes','dips','gainage','gainlat','crunch','crunch_inv','deadbug','birddog','mclimb','taps','rtwist'];
   const puiss = SEANCE === 'S6' || (n >= SEANCE_PROJET && EL().projet && EL().projet.mob === 'puiss');
-  if(puiss)renf.unshift('sjump');
   const P = [
-   {k:'P1', t:'1 · Cardio', min:3, r:'Course ou corde à sauter, puis 2 exercices au choix', intro:'Jusqu\'à la sensation de chaleur et un léger essoufflement.' + (puiss ? ' Séance Puissance : le squat jump en mise en route.' : ''), l:(puiss ? ['sjump'] : []).concat(cardio), star:puiss ? ['sjump'] : [], compte:h => nb(h, cardio.concat('sjump')) + ' / 2 au choix', ok:h => h('P1') || nb(h, cardio.concat('sjump')) >= 2},
+   {k:'P1', t:'1 · Cardio', min:5, r:'5 à 6 min : course ou corde à sauter, puis 2 exercices au choix', intro:'Jusqu\'à la sensation de chaleur et un léger essoufflement.' + (puiss ? ' Séance Puissance : le squat jump en mise en route.' : ''), l:(puiss ? ['sjump'] : []).concat(cardio), star:puiss ? ['sjump'] : [], compte:h => nb(h, cardio.concat('sjump')) + ' / 2 au choix', ok:h => h('P1') || nb(h, cardio.concat('sjump')) >= 2},
    {k:'P2', t:'2 · Articulaire', min:2, r:'Chevilles, genoux, hanches, buste, épaules, poignets', intro:'Dans cet ordre, de bas en haut : 10 cercles dans chaque sens.', l:mob, compte:h => nb(h, mob) + ' / 6', ok:h => h('P2') || nb(h, mob) === mob.length},
-   {k:'P3', t:'3 · Activation', min:3, r:star.length ? '4 au choix : les ★ préparent tes exercices du jour' : '4 au choix, 10 répétitions lentes', intro:'Le placement des ateliers, sans charge.', l:act, star, compte:h => nb(h, act) + ' / 4 au choix', ok:h => h('P3') || nb(h, act) >= 4}];
+   {k:'P3', t:'3 · Activation + gainage obligatoire', min:4, r:'Gainage (planche 20 à 30 s) obligatoire, puis 3 au choix' + (star.length ? ' : les ★ préparent tes exercices du jour' : ', 10 répétitions lentes'), intro:'Obligatoire pour tous : une série de gainage (planche 20 à 30 s) pour activer la sangle abdominale, sans aller jusqu\'à la fatigue : elle doit protéger ton dos pendant les charges. Puis le placement des ateliers, sans charge.', l:['gainage'].concat(act), star:['gainage'].concat(star), compte:h => (h('gainage') ? 'gainage ✓ · ' : 'gainage à faire · ') + nb(h, act) + ' / 3 au choix', ok:h => h('P3') || (h('gainage') && nb(h, act) >= 3)}];
   if(n >= 4 && jour.length){const sp = jour.map(at => 'sp:' + at);
     P.push({k:'P5', t:'4 · Spécifique', min:3, r:'La série d\'approche de chaque exercice du jour', intro:'Environ 50 % de ta charge de travail, 8 répétitions, en soignant le placement.', compte:h => nb(h, sp) + ' / ' + sp.length, ok:h => h('P5') || nb(h, sp) === sp.length,
       l:jour.map(at => {const a = atelier(at);return {html:`<button type="button" class="wcard${(sea(EL(), SEANCE).ech || {}).wc && sea(EL(), SEANCE).ech.wc.includes('sp:' + at) ? ' on' : ''}" data-wc="sp:${at}"><img src="${imgAtelier(at) || ''}" alt="" loading="lazy"><b>${esc(a.nom)}</b><span>${(() => {const ap = approche(a, prevuDe(EL(), SEANCE, at));return ap ? '🔸 ' + esc(ap.txt) : esc(POINT_CLE[at] || '')})()}</span></button>`}})});}
-  else if(n === 2 || n === 3)P.push({k:'P5', t:'4 · Spécifique', min:3, r:'1 série de 10 sans charge des ateliers que tu vas tester', l:[], ok:h => h('P5')});
+  else P.push({k:'P5', t:'4 · Spécifique', min:3, r:n === 1 ? '1 série légère (barre à vide) sur le premier atelier du circuit' : '1 série légère (barre à vide, 10 répétitions) sur le premier atelier que tu vas tester', l:[], ok:h => h('P5')});
   return P;
 }
 /* minuteur d'une partie de l'échauffement */
@@ -325,6 +427,8 @@ function wTimer(sec){clearInterval(WT && WT.i);const fin = Date.now() + sec * 10
       const w = $('wtimer');if(w)w.hidden = true;toast('⏱ Temps écoulé : partie suivante')}};
   WT = {fin, i:setInterval(maj, 500)};maj();
 }
+/* v6.0 : le titre ouvre la même fiche que l'image */
+function titreFiche(id, txt){return `<button type="button" class="titre-fiche" data-fiche="${id}">${esc(txt || atelier(id).nom)}</button>`}
 function vignette(id){
   const im = imgAtelier(id), a = atelier(id);
   return im ? `<button type="button" class="vign-bt" data-fiche="${id}" aria-label="Fiche : ${esc(a.nom)}"><img class="vign" src="${im}" alt="" loading="lazy"></button>`
@@ -410,19 +514,21 @@ function lancerBinome(){
   const E2 = B.e.slice(0, 2), ats = [$('cb0').value, $('cb1').value];fermerFen();
   const P = E2.map((e, i) => {const at = ats[i], a = atelier(at), p = prevuDe(e, SEANCE, at) || {}, M = MOBILES[p.mob] || {};
     const ch = p.charge && p.charge.charge ? fmtKg(p.charge.charge) : (a.niveaux && p.niv != null ? 'Niv. ' + (p.niv + 1) : '');
-    const ap = approche(a, p);return {prenom:prenom(e.nom), nom:a.nom, img:imgAtelier(at), mob:p.mob, mobNom:M.nom, bloque:p.mob === 'volume' || p.mob === 'puiss', approche:ap ? ap.txt : '', series:p.series || 3, reps:p.reps || 10, temps:!!a.temps, chargeTxt:ch, recupS:M.recupS || 90, cle:POINT_CLE[at] || ''}});
+    const ap = approche(a, p);return {prenom:prenom(e.nom), nom:a.nom, img:imgAtelier(at), mob:p.mob, mobNom:M.nom, bloque:p.mob === 'volume' || p.mob === 'puiss', approche:ap ? ap.txt : '', rappel:rappelMobile(p.mob), compo:p.charge ? p.charge.compo : '', series:p.series || 3, reps:p.reps || 10, temps:!!a.temps, chargeTxt:ch, recupS:M.recupS || 90, cle:POINT_CLE[at] || ''}});
   MinuteurM.binome(P, {onFin:r => {
     E2.forEach((e, i) => {const at = ats[i], s = sea(e, SEANCE);s.exos = s.exos || {};const x = s.exos[at] = s.exos[at] || {}, p = prevuDe(e, SEANCE, at);
       if(r.faites[i] > 0)x.real = {series:r.faites[i], reps:p ? p.reps : 10, charge:p && p.charge ? p.charge.charge : null, niv:p ? p.niv : null, diff:!!(p && r.faites[i] !== p.series)};
       if(r.cle[i]){x.avis = x.avis || {signes:[], conseil:''};x.avis.par = E2[1 - i].nom;x.avis.cle = r.cle[i]}});
     sauver();rendre();toast('Enregistré pour vous deux : notez vos ressentis et vos conseils.')}});
 }
+/* v6.0 : rappel court des attendus du mobile, affiché pendant le chrono */
+function rappelMobile(mob){const M = MOBILES[mob];return M ? `${M.nom} (${M.theme.toLowerCase()}) : ${M.exec.charAt(0).toLowerCase() + M.exec.slice(1)} · récup ${M.recup}` : ''}
 /* v2.12 : chrono des séries (minuteur.js) : temps de travail, récupération du mobile, dessin, point clé pour le coach */
 function lancerChrono(at){
   const e = EL(), a = atelier(at), p = prevuDe(e, SEANCE, at);if(!p)return toast('Pas de paramètres prévus pour cet exercice.');
   const M = MOBILES[p.mob] || {}, aut = autre();
   const ch = p.charge && p.charge.charge ? fmtKg(p.charge.charge) : (a.type === 'variante' && a.niveaux && p.niv != null ? 'Niv. ' + (p.niv + 1) : '');
-  MinuteurM.ouvrir({at, nom:a.nom, img:imgAtelier(at), mob:p.mob, mobNom:M.nom, series:p.series, reps:p.reps, temps:!!a.temps, chargeTxt:ch,
+  MinuteurM.ouvrir({at, nom:a.nom, img:imgAtelier(at), mob:p.mob, mobNom:M.nom, rappel:rappelMobile(p.mob), series:p.series, reps:p.reps, temps:!!a.temps, chargeTxt:ch,
     recupS:M.recupS || 90, approche:(approche(a, p) || {}).txt || '', cle:POINT_CLE[at] || '', crit:a.crit || [], signes:SIGNES, partenaire:aut ? prenom(aut.nom) : '',
     onFait:() => {const b = document.createElement('button');b.type = 'button';b.dataset.fait = at;b.hidden = true;document.body.appendChild(b);b.click();b.remove()}});
 }
@@ -457,7 +563,7 @@ function carteCircuit(){
   const s = sea(EL(), 'S1'), c = s.circuit || {};
   const fait = CIRCUIT_S1.filter(id => c[id]).length;
   return `<section class="carte"><h3>Circuit · ${CIRCUIT_S1.length} ateliers</h3><p class="small">4 min par atelier : 2 × 10 répétitions chacun, charge légère. On apprend le geste. <b>${fait}/${CIRCUIT_S1.length}</b> faits.</p>
-   ${CIRCUIT_S1.map((id, i) => {const a = atelier(id);return `<div class="ex${c[id] ? ' fait' : ''}"><header>${vignette(id)}<b style="flex:1">${i + 1}. ${esc(a.nom)}</b><button type="button" class="bt mini${c[id] ? ' ok' : ''}" data-circuit="${id}">${c[id] ? '✓ Fait' : 'Fait'}</button></header></div>`}).join('')}</section>`;
+   ${CIRCUIT_S1.map((id, i) => {const a = atelier(id);return `<div class="ex${c[id] ? ' fait' : ''}"><header>${vignette(id)}${titreFiche(id, (i + 1) + '. ' + a.nom)}<button type="button" class="bt mini${c[id] ? ' ok' : ''}" data-circuit="${id}">${c[id] ? '✓ Fait' : 'Fait'}</button></header></div>`}).join('')}</section>`;
 }
 const QUESTIONS = [
  {k:'freq', q:"Combien de fois par semaine fais-tu une activité physique (club, AS, salle, vélo, marche…) ?", o:['0','1','2','3','4','5 ou plus']},
@@ -486,46 +592,113 @@ function carteSitue(){
    ${m ? `<p class="retour ok">Mobile suggéré : <b>${MOBILES[m].nom}</b> (${MOBILES[m].theme}). Tu les essaieras tous les trois (S4 à S6) avant de choisir en S6.</p>` : ''}</section>`;
 }
 /* ---------- Test 10 RM ---------- */
+/* ---------- v6.0 : absences et rattrapage (suivi individuel) ---------- */
+const absent = (e, S) => !!(e.abs && e.abs[S || SEANCE]);
+function carteAbsence(){
+  if(B.e.length < 2 && !absent(EL()))return '';
+  return `<div class="abs-l"><span>Absent(e) aujourd'hui ?</span>${B.e.map((x, i) => `<button type="button" class="${absent(x) ? 'ici' : ''}" data-abs="${i}" aria-pressed="${absent(x)}">${absent(x) ? '✗ ' : ''}${esc(prenom(x.nom))}${absent(x) ? ' absent(e)' : ''}</button>`).join('')}</div>
+   ${absent(EL()) ? `<p class="retour non">${esc(prenom(EL().nom))} est noté(e) <b>absent(e) en ${SEANCE}</b> : rien n'est attendu aujourd'hui. Ce qui n'a pas été fait reste <b>à rattraper</b> plus tard, sans bloquer la suite.</p>` : ''}`;
+}
+/* statut d'un atelier du test pour un élève */
+function statutTest(e, id){
+  if(e.rm[id])return {k:'ok', t:'✓ Validé'};
+  if(T && T.at === id && B.e[T.el] === e)return {k:'cours', t:'◐ En cours'};
+  const n = +SEANCE.slice(1);
+  if(n > 3 || (n === 3 && absent(e, 'S2')))return {k:'ratt', t:'⏳ À rattraper'};
+  return {k:'faire', t:'○ À réaliser'};
+}
+function protocole10RM(ouvert){
+  return `<details class="carte info protocole"${ouvert ? ' open' : ''}><summary>📘 Mode d'emploi du test 10 RM</summary><ol class="ats small">
+   <li><b>Le 10 RM</b>, c'est la charge la plus lourde que tu soulèves <b>10 fois de suite, proprement</b>, sans aide et avec la technique de la fiche.</li>
+   <li><b>Avant de commencer</b> : lis la fiche de l'exercice (touche l'image ou le titre).</li>
+   <li><b>Première charge</b> : légère, une charge que tu pourrais soulever 15 fois (l'appli en propose une).</li>
+   <li><b>Les 10 répétitions</b> : amplitude complète, montée et descente contrôlées. Ton partenaire compte à voix haute et touche <b>No REP</b> si une répétition est mal faite.</li>
+   <li><b>La charge était-elle adaptée ?</b> Après 10 répétitions, dis combien tu aurais encore pu en faire : <b>5 ou plus</b> → on ajoute 5 kg de chaque côté ; <b>2 à 4</b> → 2 kg de chaque côté (1 kg sur un haltère) ; <b>0 ou 1</b> → c'est ton 10 RM.</li>
+   <li><b>Diminuer</b> : si tu n'arrives pas à 10 répétitions propres, la série s'arrête ; ta dernière charge réussie 10 fois compte.</li>
+   <li><b>Quand arrêter</b> : à la première série ratée, dès que la technique se dégrade, ou après 5 séries. 2 min de récupération entre deux séries. <b>Jamais de répétition forcée, jamais d'aide pour finir.</b></li>
+   <li><b>Enregistrer</b> : ton partenaire valide. L'appli garde ton 10 RM et en déduit ta charge max estimée, qui sert à calculer tes charges en % dans les séances suivantes.</li></ol></details>`;
+}
 function carteTest(){
   const e = EL();
   const nb = ATELIERS_TEST.filter(id => e.rm[id]).length, bas = ATELIERS_TEST.some(id => e.rm[id] && atelier(id).zone === 'bas');
-  return `<section class="carte"><h3>Test 10 RM · ${esc(prenom(e.nom))}</h3><p class="small">La charge la plus lourde soulevée 10 fois sans No REP, en montant progressivement. Le partenaire tient le téléphone et juge.</p>
-   <p class="retour ${nb >= OBJ_TESTS[0] ? 'ok' : 'non'}"><b>${nb} charge${nb > 1 ? 's' : ''} max</b> sur ${ATELIERS_TEST.length} ateliers · objectif ${OBJ_TESTS[0]} à ${OBJ_TESTS[1]} à la fin de la S3 (4 à 5 par séance)${bas ? '' : ' · pense à un atelier du bas du corps'}.</p>
-   ${ATELIERS_TEST.slice().sort((x, y) => (e.rm[x] ? 1 : 0) - (e.rm[y] ? 1 : 0)).map(id => {const a = atelier(id), r = e.rm[id];return `<div class="ex${r ? ' fait' : ''}"><header>${vignette(id)}<b style="flex:1">${esc(a.nom)}</b>${r ? `<span><b>${fmtKg(r.cm)}</b> <span class="small muted">${r.mode === 'direct' ? 'saisie directe' : 'test'}</span></span>` : ''}</header>
-     <div class="rangee"><button type="button" class="bt mini act" data-test="${id}">${r ? 'Refaire le test' : 'Commencer le test'}</button><button type="button" class="bt mini" data-direct="${id}">Saisie directe</button></div></div>`}).join('')}</section>`;
+  const restants = ATELIERS_TEST.filter(id => !e.rm[id]), faits = ATELIERS_TEST.filter(id => e.rm[id]);
+  const ligne = id => {const a = atelier(id), r = e.rm[id], st = statutTest(e, id);
+    return `<div class="ex${r ? ' fait' : ''}"><header>${vignette(id)}${titreFiche(id)}<span class="statut st-${st.k}">${st.t}</span></header>
+     ${r ? `<p class="small">${r.dix ? `10 RM : <b>${fmtKg(r.dix)}</b> · ` : r.charge ? `${fmtKg(r.charge)} × ${r.reps} · ` : ''}charge max estimée <b>${fmtKg(r.cm)}</b> <span class="muted">(${MODE_RM[r.mode] || r.mode})</span></p>` : ''}
+     <div class="rangee"><button type="button" class="bt mini act" data-test="${id}">${r ? 'Refaire le test' : 'Commencer le test'}</button><button type="button" class="bt mini" data-direct="${id}">Saisie directe</button></div></div>`};
+  return `${protocole10RM(!nb)}<section class="carte"><h3>Mes tests 10 RM · ${esc(prenom(e.nom))}</h3>
+   <p class="retour ${nb >= OBJ_TESTS[0] ? 'ok' : 'non'}"><b>${nb} / ${ATELIERS_TEST.length}</b> charges de référence · objectif ${OBJ_TESTS[0]} à ${OBJ_TESTS[1]} à la fin de la S3 (4 à 5 par séance)${bas ? '' : ' · pense à un atelier du bas du corps'}.</p>
+   ${restants.length ? `<h4>${SEANCE === 'S2' ? 'À réaliser' : 'Il te reste'} (${restants.length})</h4>${restants.map(ligne).join('')}` : `<p class="retour ok">Tous tes ateliers ont une charge de référence ✓</p>`}
+   ${faits.length ? `<details class="deja"><summary>Déjà validés (${faits.length}) : voir ou refaire</summary>${faits.map(ligne).join('')}</details>` : ''}</section>`;
+}
+/* S4 et après : les charges de référence qui manquent pour les exercices du jour */
+function carteRattrapage(ids){
+  const e = EL(), m = (ids || []).filter(at => atelier(at).type === 'charge' && !e.rm[at]);
+  if(!m.length || absent(e))return '';
+  return `<section class="carte alerte-c"><h3>⏳ À rattraper · ${esc(prenom(e.nom))}</h3><p class="small">Pas encore de charge de référence sur ${m.length > 1 ? 'ces exercices' : 'cet exercice'} : fais le test 10 RM au début de l'exercice (5 min environ), ou une saisie directe si tu connais ta charge. Rien n'est bloqué.</p>
+   ${m.map(at => `<div class="rangee ratt"><b>${esc(atelier(at).nom)}</b><button type="button" class="bt mini act" data-test="${at}">Test 10 RM</button><button type="button" class="bt mini" data-direct="${at}">Saisie directe</button></div>`).join('')}</section>`;
 }
 let T = null; // test en cours
 function ouvrirTest(at){
   const a = atelier(at), e = EL(), pas = pasMontee(a.support);
   const dep = chargeReelle(a.support, a.depart || SUPPORTS[a.support].vide || 4);
-  T = {at, el:P, series:[], charge:dep ? dep.charge : 4, cpt:0, norep:0, suite:0, phase:'serie', pas, recupFin:0};
+  T = {at, el:P, series:[], charge:dep ? dep.charge : 4, cpt:0, norep:0, suite:0, phase:'serie', pas, recupFin:0, reserve:''};
   rendreTest();
+}
+/* v6.0 : détail de la charge (barre, par côté, total) et réglage avec les vrais disques */
+function detailCharge(sup, charge){
+  const s = SUPPORTS[sup];if(!s)return '';
+  if(s.fixes)return `<p class="detail-ch"><span>Haltère fixe : <b>${fmtKg(charge)}</b></span></p>`;
+  if(!s.disques)return '';
+  const cote = +((charge - s.vide) / 2).toFixed(2), d = disquesCote(sup, charge);
+  return `<p class="detail-ch"><span>${esc(s.nom)} : <b>${fmtKg(s.vide)}</b></span><span>Par côté : <b>${fmtKg(cote)}</b>${d.length ? ` (${d.map(x => String(x).replace('.', ',')).join(' + ')})` : ' (aucun disque)'}</span><span>Total : <b>${fmtKg(charge)}</b>${s.unite === 'par haltère' ? ' par haltère' : ''}</span></p>`;
+}
+function reglageCharge(sup){
+  const s = SUPPORTS[sup];if(!s)return '';
+  if(s.fixes)return `<div class="disq"><button type="button" data-tfix="-1">− haltère plus léger</button><button type="button" data-tfix="1">+ haltère plus lourd</button></div>`;
+  return `<p class="small" style="text-align:center;margin:6px 0 2px">Disques <b>de chaque côté</b>${s.unite === 'par haltère' ? ' de l\'haltère' : ' de la barre'} :</p>
+   <div class="disq">${[10, 5, 2, 1].map(d => `<button type="button" class="moins" data-tdisq="-${d}" aria-label="retirer ${d} kg de chaque côté">− ${d}</button>`).join('')}</div>
+   <div class="disq">${[1, 2, 5, 10].map(d => `<button type="button" class="plus" data-tdisq="${d}" aria-label="ajouter ${d} kg de chaque côté">+ ${d}</button>`).join('')}</div>`;
+}
+/* montée conseillée selon la réserve annoncée après 10 répétitions */
+function monteeConseillee(sup, base, reserve){
+  const s = SUPPORTS[sup], p = chargesPossibles(sup);if(!s || reserve === '01')return base;
+  if(s.fixes){const i = p.indexOf(base), k = reserve === '5' ? 2 : 1;return p[Math.min(p.length - 1, i + k)] != null ? p[Math.min(p.length - 1, i + k)] : base}
+  const cote = s.vide <= 2 ? (reserve === '5' ? 2 : 1) : (reserve === '5' ? 5 : 2);
+  return +(base + 2 * cote).toFixed(1);
 }
 function rendreTest(){
   if(!T){const x = $('ecranTest');if(x)x.remove();return}
-  const a = atelier(T.at), e = B.e[T.el], r = chargeReelle(a.support, T.charge);
+  const a = atelier(T.at), e = B.e[T.el];
   let el = $('ecranTest');if(!el){el = document.createElement('div');el.className = 'ecran';el.id = 'ecranTest';document.body.appendChild(el)}
   const series = `<div class="series">${T.series.map((s, i) => `<span class="${s.valides >= 10 ? 'ok' : ''}">S${i + 1} : ${fmtKg(s.charge)} × ${s.valides}${s.norep ? ` (${s.norep} No REP)` : ''}</span>`).join('')}</div>`;
-  let h = `<div class="rangee" style="justify-content:space-between"><h3>Test 10 RM · ${esc(a.nom)}</h3><button type="button" class="bt mini" data-act="annulerTest">Quitter</button></div><p class="muted small">${esc(prenom(e.nom))} soulève, le partenaire juge. Série ${T.series.length + (T.phase === 'serie' ? 1 : 0)} sur 5 au maximum.</p>${series}`;
+  let h = `<div class="rangee" style="justify-content:space-between"><h3>Test 10 RM · ${titreFiche(T.at)}</h3><button type="button" class="bt mini" data-act="annulerTest">Quitter</button></div><p class="muted small">${esc(prenom(e.nom))} soulève, le partenaire compte et juge. Série ${T.series.length + (T.phase === 'serie' ? 1 : 0)} sur 5 au maximum.</p>${series}`;
   if(T.phase === 'serie'){
-    h += `<div class="charge-grande">${fmtKg(T.charge)}</div><p class="compo" style="text-align:center">${r ? esc(r.compo) : ''}</p>
-     ${T.cpt === 0 ? `<div class="rangee" style="justify-content:center"><button type="button" class="bt mini" data-tcharge="-1">− ${fmtKg(T.pas)}</button><button type="button" class="bt mini" data-tcharge="1">+ ${fmtKg(T.pas)}</button></div>` : ''}
+    h += `<div class="charge-grande">${fmtKg(T.charge)}</div>${detailCharge(a.support, T.charge)}
+     ${T.cpt === 0 ? reglageCharge(a.support) : ''}
      <div class="compteur">${T.cpt}<small>répétitions valides${T.norep ? ` · ${T.norep} No REP` : ''}</small></div>
      <div class="rangee"><button type="button" class="bt ok geant" data-act="tPlus">+ 1</button><button type="button" class="bt danger geant" data-act="tNo">No REP</button></div>
      <p class="small muted">No REP : amplitude incomplète, trajet déformé, charge non freinée. Deux No REP de suite arrêtent la série.</p>
      <button type="button" class="bt pleine" data-act="tFinSerie" style="margin-top:8px">L'élève s'arrête : fin de la série</button>`;
   } else if(T.phase === 'recup'){
-    h += `<p class="retour ok">10 répétitions valides ! On monte : ${fmtKg(T.charge)}.</p>${T.series.length === 1 ? `<h4>Ressenti à la 1re série</h4>${ressentiHTML('test.' + T.at + '.premiere', (e.tests[T.at] || {ressentis:{}}).ressentis.premiere)}` : ''}
-     <div class="chrono" id="tChrono">2:00</div><p class="small muted" style="text-align:center">Récupération : le partenaire fait sa série pendant ce temps.</p>
-     <button type="button" class="bt act pleine" data-act="tSuivante">Série suivante à ${fmtKg(T.charge)}</button>`;
+    const R = [['5', '5 ou plus'], ['24', '2 à 4'], ['01', '0 ou 1']];
+    h += `<p class="retour ok">✓ 10 répétitions propres à ${fmtKg(T.base)}.</p>
+     <p class="bti">Combien de répétitions propres te restait-il ?</p><div class="seg trois">${R.map(([k, t]) => `<button type="button" class="${T.reserve === k ? 'ici' : ''}" data-treserve="${k}">${t}</button>`).join('')}</div>
+     ${T.reserve === '01' ? `<p class="retour ok">Tu es à ton <b>10 RM</b> : arrête-toi ici, inutile de forcer.</p><button type="button" class="bt ok pleine" data-act="tStop">✓ Terminer : ${fmtKg(T.base)} est mon 10 RM</button>`
+      : T.reserve ? `<p class="small">On monte : prochaine série à <b>${fmtKg(T.charge)}</b>. Tu peux l'ajuster avec les disques.</p><div class="charge-grande petite">${fmtKg(T.charge)}</div>${detailCharge(a.support, T.charge)}${reglageCharge(a.support)}` : ''}
+     ${T.series.length === 1 ? `<h4>Ressenti à la 1re série</h4>${ressentiHTML('test.' + T.at + '.premiere', (e.tests[T.at] || {ressentis:{}}).ressentis.premiere)}` : ''}
+     <div class="chrono" id="tChrono">2:00</div><p class="small muted" style="text-align:center">Récupération (2 min) : le partenaire fait sa série pendant ce temps.</p>
+     ${T.reserve && T.reserve !== '01' ? `<button type="button" class="bt act pleine" data-act="tSuivante">Série suivante à ${fmtKg(T.charge)}</button>` : ''}
+     ${T.reserve !== '01' ? `<button type="button" class="bt pleine" data-act="tStop" style="margin-top:8px">J'arrête ici</button>` : ''}`;
   } else {
-    const best = meilleure(T.series);
-    h += best ? `<p class="retour ok">Charge max estimée : <b style="font-size:26px">${fmtKg(best.cm)}</b><br><span class="small">d'après ${fmtKg(best.charge)} × ${best.valides} (Brzycki)</span></p>` : `<p class="retour non">Pas de série d'au moins 3 répétitions : recommence plus léger.</p>`;
+    const best = meilleure(T.series), dix = dixRM(T.series);
+    h += best ? `<p class="retour ok">${dix ? `Ton 10 RM : <b style="font-size:26px">${fmtKg(dix)}</b><br>` : `Pas de série complète de 10 : estimation d'après ${fmtKg(best.charge)} × ${best.valides}.<br>`}<span class="small">Charge max estimée : <b>${fmtKg(best.cm)}</b> (elle sert à calculer tes charges en %).</span></p>` : `<p class="retour non">Pas de série d'au moins 3 répétitions : recommence plus léger.</p>`;
     h += `<h4>Ressenti à la dernière série</h4>${ressentiHTML('test.' + T.at + '.derniere', (e.tests[T.at] || {ressentis:{}}).ressentis.derniere)}`;
     h += best ? `<button type="button" class="bt ok pleine" data-act="tValider">✓ Je valide (partenaire)</button>` : `<button type="button" class="bt act pleine" data-act="tRecommencer">Recommencer plus léger</button>`;
   }
   el.innerHTML = h;
 }
+const dixRM = series => {const l = series.filter(s => s.valides >= 10).map(s => s.charge);return l.length ? Math.max(...l) : null};
 function meilleure(series){
   let b = null;
   series.forEach(s => {const v = Math.min(10, s.valides), cm = brzycki(s.charge, v);if(cm && (!b || cm > b.cm))b = {cm, charge:s.charge, valides:v}});
@@ -534,20 +707,21 @@ function meilleure(series){
 function finSerie(){
   T.series.push({charge:T.charge, valides:T.cpt, norep:T.norep});
   const ok = T.cpt >= 10;T.cpt = 0;T.norep = 0;T.suite = 0;
-  if(ok && T.series.length < 5){const p = chargesPossibles(atelier(T.at).support), suiv = p.find(c => c >= T.charge + T.pas - 1e-9);if(suiv){T.charge = suiv;T.phase = 'recup';T.recupFin = Date.now() + 120000;rendreTest();return}}
+  if(ok && T.series.length < 5){T.base = T.charge;T.reserve = '';T.phase = 'recup';T.recupFin = Date.now() + 120000;rendreTest();return}
   T.phase = 'fin';rendreTest();
 }
 setInterval(() => {const c = $('tChrono');if(!c || !T)return;const r = Math.max(0, Math.round((T.recupFin - Date.now()) / 1000));c.textContent = Math.floor(r / 60) + ':' + String(r % 60).padStart(2, '0');if(r === 0)c.style.color = 'var(--ok)'}, 500);
 function validerTest(){
   const e = B.e[T.el], best = meilleure(T.series);if(!best)return;
-  majRM(e, T.at, {cm:best.cm, charge:best.charge, reps:best.valides, date:jour(), mode:'test'});
+  if(rmVerrou(e))return toast('Charges max bloquées pendant l\'évaluation (S9).');
+  majRM(e, T.at, {cm:best.cm, charge:best.charge, reps:best.valides, dix:dixRM(T.series), date:jour(), mode:'test', S:SEANCE});
   const t = e.tests[T.at] = e.tests[T.at] || {ressentis:{}};t.series = T.series;t.date = jour();
-  sauver();T = null;rendreTest();rendre();toast('Charge max enregistrée');
+  sauver();T = null;rendreTest();rendre();toast('Charge de référence enregistrée');
 }
 function saisieDirecte(at){
   const a = atelier(at);
-  fenetre(`<h3>Saisie directe · ${esc(a.nom)}</h3><p class="small">Une série réussie proprement : la charge (${esc(SUPPORTS[a.support].unite)}) et le nombre de répétitions (3 à 10).</p>
-   <label class="ch">Charge (kg)</label><input type="number" inputmode="decimal" id="dCh"><label class="ch">Répétitions</label><input type="number" inputmode="numeric" id="dRp" min="3" max="10">
+  fenetre(`<h3>Saisie directe · ${esc(a.nom)}</h3><p class="small">Tu connais déjà ta charge, sans refaire de test : indique une série réussie <b>proprement</b>, sans aide. Idéalement 10 répétitions (ton 10 RM) ; entre 3 et 10 accepté.</p>
+   <label class="ch">Charge totale (kg, ${esc(SUPPORTS[a.support].unite)})</label><input type="number" inputmode="decimal" id="dCh"><label class="ch">Répétitions réussies</label><input type="number" inputmode="numeric" id="dRp" min="3" max="10" value="10">
    <p class="small" id="dRes"></p><div class="rangee"><button type="button" class="bt act" data-act="valDirect" data-at="${at}">Enregistrer</button><button type="button" class="bt" data-act="fermerFen">Annuler</button></div>`);
 }
 /* ---------- Défi ---------- */
@@ -561,7 +735,8 @@ function defiBinome(){
 }
 function carteDefi(){
   const d = defiBinome();
-  return `<section class="carte"><h3>Défi par équipes</h3><p class="small">Votre équipe (donnée par le professeur) :</p><div class="chips">${['A','B','C','D'].map(x => `<button type="button" class="${B.equipe === x ? 'ici' : ''}" data-equipe="${x}">Équipe ${x}</button>`).join('')}</div>
+  return `<section class="carte"><h3>🏆 Défi par équipes (S2 et S3)</h3><p class="small"><b>À quoi ça sert ?</b> Le professeur partage la classe en 4 équipes. Les kilos de vos tests 10 RM s'ajoutent à ceux de votre équipe, et l'écran du professeur affiche le classement de la classe. Ça ne change <b>rien</b> à vos charges ni à vos séances.</p>
+   <p class="small"><b>Touchez la lettre de l'équipe annoncée par le professeur</b>, puis montrez le QR de fin de séance :</p><div class="chips">${['A','B','C','D'].map(x => `<button type="button" class="${B.equipe === x ? 'ici' : ''}" data-equipe="${x}">Équipe ${x}</button>`).join('')}</div>
    <p>Votre binôme rapporte <b>${fmtKg(d.kg)}</b> et <b>${d.q}</b> points de qualité.</p><p class="small muted">Kilos : la meilleure charge à 10 répétitions de chacun, sur tous les ateliers testés en S2 et S3. Qualité : + 1 par série sans No REP, + 2 par montée progressive, − 1 par No REP.</p></section>`;
 }
 /* ---------- QR « Mots et défi » (aucun nom) ---------- */
@@ -590,7 +765,8 @@ function carteMobile(mob){return mob ? `<div class="mob-bandeau"><img src="${MOB
 function listeExos(ids, projet){
   const e = EL(), S = SEANCE, s = sea(e, S);s.exos = s.exos || {};
   if(!projet){const l = B.listes[S];if(l)ids = l}
-  const bin = B.e.length > 1 && window.MinuteurM && MinuteurM.binome ? `<section class="carte chb-pub"><h3>⏱ Chrono binôme</h3><p class="small">Un seul écran pour vous deux : l'un travaille (vert), l'autre récupère et le regarde (rouge). « Série finie » : vous échangez.</p><button type="button" class="bt act pleine" data-act="chronoBinome">Lancer le chrono binôme</button></section>` : '';
+  const pres = B.e.slice(0, 2).filter(x => !absent(x));
+  const bin = B.e.length > 1 && pres.length < 2 ? `<p class="small muted">Partenaire absent : utilise le « chrono des séries » de chaque exercice.</p>` : B.e.length > 1 && window.MinuteurM && MinuteurM.binome ? `<section class="carte chb-pub"><h3>⏱ Chrono binôme</h3><p class="small">Un seul écran pour vous deux : l'un travaille (vert), l'autre récupère et le regarde (rouge). « Série finie » : le partenaire a un temps de transition (orange) pour changer ses disques, puis touche « JE SUIS PRÊT ».</p><button type="button" class="bt act pleine" data-act="chronoBinome">Lancer le chrono binôme</button></section>` : '';
   return bin + `<h3 style="margin-top:16px">Les exercices · ${esc(prenom(e.nom))}</h3>${projet ? '' : `<p class="small muted">Liste du binôme ; <button type="button" class="lien" data-act="changerListe">changer un exercice</button>.</p>`}` + ids.map(at => carteExo(at, at === (s.exCle && ids.includes(s.exCle) ? s.exCle : ids[0]))).join('');
 }
 const OUVERT = new Set();   // fiches terminées rouvertes à la main
@@ -599,7 +775,7 @@ function carteExo(at, estCle){
   const r = ex.ressenti || {}, coh = ex.coh, aut = autre(), n = +SEANCE.slice(1);
   const fini = n >= 4 && ex.real && ficheFinie(ex, p, aut, estCle);
   const etat = fini ? ' fait' : ex.real && coh && !coh.ok && n < 4 ? ' alerte' : '';
-  let h = `<div class="ex${etat}" id="ex-${at}"><header>${vignette(at)}<b style="flex:1">${esc(a.nom)}</b><span class="small muted">${esc(a.groupe)}</span></header>`;
+  let h = `<div class="ex${etat}" id="ex-${at}"><header>${vignette(at)}${titreFiche(at)}<span class="small muted">${esc(a.groupe)}</span></header>`;
   if(fini && !OUVERT.has(at))return h + resumeFiche(at, ex, p) + '</div>';
   h += rappelPrec(at, ex) + prevuTexte(a, p);
   if(a.type === 'charge' && !(p && p.charge))h += `<p class="small">Pas encore de charge max sur cet atelier : <button type="button" class="lien" data-direct="${at}">saisie directe</button> (une série réussie entre 3 et 10 répétitions).</p>`;
@@ -826,22 +1002,33 @@ function pasHTML(i, k, v, u){return `<span class="rangee" style="gap:4px"><butto
 function bornes(mob, k){const m = MOBILES[mob];return k === 'pct' ? m.pct : k === 'series' ? m.series : m.reps}
 
 /* ================== Vue : carnet ================== */
+function resumeBilan(b){return ['obj', 'cons', 'vecu', 'reg', 'sur', 'role'].filter(k => b[k]).map(k => `${{obj:'objectif', cons:'consignes', vecu:'effort', reg:'prochaine fois', sur:'sur', role:'rôle'}[k]} : ${esc(bilanLib(k, b[k]))}`).join(' · ') + (b.reussi ? ` · réussi : « ${esc(b.reussi)} »` : '') + (b.ameliorer ? ` · à améliorer : « ${esc(b.ameliorer)} »` : '')}
+function carteHistoBilans(e){
+  const l = SEANCES_IDS.filter(S => +S.slice(1) >= SEANCE_MOBILE[0] && (e.seances[S] || {}).bilan);
+  if(!l.length)return '';
+  return `<section class="carte"><h3>📝 Mes bilans</h3><div class="tb-defil"><table class="tb"><tr><th>Séance</th><th>Objectif</th><th>Consignes</th><th>Effort</th><th>Prochaine fois</th><th>Rôle</th></tr>
+   ${l.map(S => {const b = e.seances[S].bilan;return `<tr><td><b>${S}</b></td><td>${esc(bilanLib('obj', b.obj))}</td><td>${esc(bilanLib('cons', b.cons))}</td><td>${esc(bilanLib('vecu', b.vecu))}</td><td>${esc(bilanLib('reg', b.reg))}${b.sur ? ' · ' + esc(bilanLib('sur', b.sur)) : ''}</td><td>${esc(bilanLib('role', b.role))}</td></tr>`}).join('')}</table></div>
+   ${l.filter(S => e.seances[S].bilan.ameliorer).map(S => `<p class="small">${S} · à améliorer : « ${esc(e.seances[S].bilan.ameliorer)} »</p>`).join('')}</section>`;
+}
 function vueCarnet(){
   const e = EL();
   return `<h2>Carnet · ${esc(e.nom)}</h2>
    ${e.situe && suggestion(e.situe) ? `<p>Je me situe : mobile suggéré <b>${MOBILES[suggestion(e.situe)].nom}</b>.</p>` : ''}
    ${e.choix && e.choix.mob ? `<div class="mob-bandeau"><img src="${MOB_IMG[e.choix.mob]}" alt=""><span>Mon mobile : ${esc(MOBILES[e.choix.mob].nom)}</span></div><p>Mobile choisi : <b>${MOBILES[e.choix.mob].nom}</b>${e.choix.pourquoi ? ' · « ' + esc(e.choix.pourquoi) + ' »' : ''}</p>` : ''}
    ${SEANCES_IDS.map(S => {const s = e.seances[S];if(!s || !Object.keys(s).length)return '';const ex = Object.entries(s.exos || {});
-     return `<section class="carte"><h3>${S} · ${esc(seanceById(S).titre)}</h3>${s.forme ? `<p class="small">Forme : ${FORME[s.forme - 1][1]} ${FORME[s.forme - 1][2]}</p>` : ''}${s.ech && s.ech.pouls ? `<p class="small">Pouls d'échauffement : ${s.ech.pouls}</p>` : ''}
+     return `<section class="carte"><h3>${S} · ${esc(seanceById(S).titre)}</h3>${absent(e, S) ? '<p class="retour non">Absent(e) à cette séance.</p>' : ''}${s.forme ? `<p class="small">Forme : ${FORME[s.forme - 1][1]} ${FORME[s.forme - 1][2]}</p>` : ''}${s.ech && s.ech.pouls ? `<p class="small">Pouls d'échauffement : ${s.ech.pouls}</p>` : ''}
       ${ex.length ? `<table class="tb"><tr><th>Exercice</th><th>Réalisé</th><th>Ressenti</th></tr>${ex.map(([at, x]) => `<tr><td>${esc(atelier(at).nom)}</td><td>${x.real ? `${x.real.series}×${x.real.reps}${x.real.charge ? ' · ' + fmtKg(x.real.charge) : ''}` : '—'}</td><td>${x.ressenti && x.ressenti.note ? `${x.ressenti.note}${x.ressenti.mot ? ' · ' + esc(x.ressenti.mot) : ''} ${x.coh ? (x.coh.ok ? '✅' : '⚠️') : ''}` : '—'}</td></tr>`).join('')}</table>` : ''}
-      ${s.analyse ? `<p class="small"><b>Analyse :</b> ${esc(s.analyse)}</p>` : ''}</section>`}).join('')}
-   <section class="carte"><h3>Charges max</h3>${Object.keys(e.rm).length ? Object.entries(e.rm).map(([at, r]) => `<p class="small">${esc(atelier(at).nom)} : <b>${fmtKg(r.cm)}</b> (${r.mode === 'direct' ? 'saisie directe' : 'test'}, ${esc(r.date)})</p>`).join('') : '<p class="small muted">Pas encore de test.</p>'}</section>`;
+      ${s.analyse ? `<p class="small"><b>Analyse :</b> ${esc(s.analyse)}</p>` : ''}${s.bilan ? `<p class="small"><b>Bilan :</b> ${resumeBilan(s.bilan)}</p>` : ''}</section>`}).join('')}
+   ${carteHistoBilans(e)}
+   <section class="carte"><h3>Charges de référence</h3>${Object.keys(e.rm).length ? Object.entries(e.rm).map(([at, r]) => `<p class="small">${esc(atelier(at).nom)} : ${r.dix ? `10 RM <b>${fmtKg(r.dix)}</b> · ` : ''}charge max estimée <b>${fmtKg(r.cm)}</b> (${MODE_RM[r.mode] || r.mode}, ${esc(r.date)})</p>`).join('') : '<p class="small muted">Pas encore de test.</p>'}
+    ${ATELIERS_TEST.some(id => !e.rm[id]) ? `<p class="small">⏳ À rattraper : ${ATELIERS_TEST.filter(id => !e.rm[id]).map(id => esc(atelier(id).nom)).join(', ')}.</p>` : ''}</section>`;
 }
 
 /* ================== Vue : envoyer ================== */
 function vueEnvoyer(){
-  const der = (B.envois || []).slice(-1)[0];
-  return `<h2>Envoyer le carnet</h2>
+  const der = (B.envois || []).slice(-1)[0], n = +SEANCE.slice(1);
+  const manque = n >= SEANCE_MOBILE[0] ? B.e.filter(x => !absent(x) && x.seances[SEANCE] && Object.keys(x.seances[SEANCE]).length && !bilanComplet(x, SEANCE)) : [];
+  return `<h2>Envoyer le carnet</h2>${manque.length ? `<p class="retour non">Il manque le bilan de ${manque.map(x => esc(prenom(x.nom))).join(' et de ')} en ${SEANCE} (30 secondes) : onglet Séance, dernière séquence.</p>` : ''}
    <section class="carte act"><h3>📤 Fichier pour le Nuage</h3><p>En fin de séance : télécharge le fichier du carnet, puis dépose-le dans le dossier Nuage donné par le professeur.</p>
     <button type="button" class="bt act pleine" data-act="exporter">Télécharger le carnet</button>${CLASSES[B.classe] && CLASSES[B.classe].u ? `<a class="bt pleine" style="margin-top:8px" href="${esc(CLASSES[B.classe].u)}" target="_blank" rel="noopener">☁️ Ouvrir le dépôt Nuage de la classe</a>` : ''}${navigator.share ? `<button type="button" class="bt pleine" style="margin-top:8px" data-act="partager">Partager le fichier</button>` : ''}
     <p class="small muted">${der ? 'Dernier envoi : ' + esc(der) : 'Pas encore envoyé.'}</p></section>
@@ -860,6 +1047,41 @@ function exporter(){
 async function partager(){
   const f = fichierCarnet(), file = new File([f.blob], f.nom, {type:'application/json'});
   try{await navigator.share({files:[file], title:'Carnet de musculation'});if(!DEMO){B.envois = (B.envois || []).concat(new Date().toLocaleString('fr-FR'));sauver()}rendre()}catch(e){if(e.name !== 'AbortError')exporter()}
+}
+
+/* ================== v6.0 : récupérer un carnet (fichier JSON exporté) ================== */
+let IMPORT = null;
+const numVersion = v => String(v || '').replace(/^v/, '').split('.').map(x => parseInt(x, 10) || 0);
+const cmpVersion = (a, b) => {const x = numVersion(a), y = numVersion(b);for(let i = 0;i < 3;i++){if((x[i] || 0) !== (y[i] || 0))return (x[i] || 0) - (y[i] || 0)}return 0};
+function choisirImport(){
+  const inp = document.createElement('input');inp.type = 'file';inp.accept = '.json,application/json';
+  inp.onchange = () => {const f = inp.files && inp.files[0];if(!f)return;if(f.size > 3e6)return toast('Fichier trop gros pour un carnet.');
+    const r = new FileReader();r.onload = () => verifierImport(String(r.result));r.onerror = () => toast('Lecture du fichier impossible.');r.readAsText(f)};
+  inp.click();
+}
+function verifierImport(txt){
+  let o = null;try{o = JSON.parse(txt)}catch(e){return fenetre(`<h3>Fichier illisible</h3><p>Ce fichier n'est pas un carnet de musculation (format JSON abîmé).</p><button type="button" class="bt pleine" data-act="fermerFen">Fermer</button>`)}
+  const err = [];
+  if(!o || o.app !== 'musculation-eleves')err.push('Ce fichier ne vient pas de l\'appli Musculation élève.');
+  else{if(typeof o.id !== 'string' || !o.id)err.push('Identifiant du carnet manquant.');
+    if(!Array.isArray(o.e) || !o.e.length || o.e.length > 3 || o.e.some(x => !x || typeof x.nom !== 'string' || typeof x.rm !== 'object' || typeof x.seances !== 'object'))err.push('Liste des élèves abîmée.');
+    if(o.version && cmpVersion(o.version, MUSCU_VERSION) > 0)err.push(`Fichier fait avec une version plus récente (${esc(o.version)}) : mets d'abord l'appli à jour.`)}
+  if(err.length)return fenetre(`<h3>Import impossible</h3><ul class="ats">${err.map(t => `<li>${t}</li>`).join('')}</ul><button type="button" class="bt pleine" data-act="fermerFen">Fermer</button>`);
+  IMPORT = o;const deja = CARNETS[o.id], nbRm = o.e.reduce((a, x) => a + Object.keys(x.rm || {}).length, 0);
+  fenetre(`<h3>📥 Récupérer ce carnet ?</h3><p><b>${esc(o.e.map(x => x.nom).join(' & '))}</b>${o.classe ? ' · ' + esc(o.classe) : ''}</p>
+   <p class="small">Exporté le ${o.exporte ? esc(new Date(o.exporte).toLocaleString('fr-FR')) : '?'} · version ${esc(o.version || 'ancienne')} · ${nbRm} charge(s) de référence.</p>
+   ${o.version && cmpVersion(o.version, MUSCU_VERSION) < 0 ? `<p class="small muted">Fichier d'une version plus ancienne : il reste lisible, rien n'est perdu.</p>` : ''}
+   ${deja ? `<p class="retour non">⚠️ Ce carnet existe déjà sur ce téléphone (modifié le ${esc(new Date(deja.maj || 0).toLocaleString('fr-FR'))}). Il sera <b>remplacé</b> par le fichier ; l'actuel est gardé en copie de sécurité.</p>` : ''}
+   <p class="small">Choisissez un code secret du binôme (4 chiffres) pour ce téléphone :</p><input type="password" inputmode="numeric" maxlength="4" id="iCode" class="code" autocomplete="off"><p class="small" id="iErr" style="color:var(--alerte);font-weight:700;min-height:1.3em"></p>
+   <div class="rangee"><button type="button" class="bt act" data-act="valImport">${deja ? 'Remplacer' : 'Récupérer'}</button><button type="button" class="bt" data-act="fermerFen">Annuler</button></div>`);
+}
+async function validerImport(){
+  const o = IMPORT, code = ($('iCode') || {}).value || '';if(!o)return;
+  if(!/^\d{4}$/.test(code.trim())){$('iErr').textContent = 'Le code secret : 4 chiffres.';return}
+  if(CARNETS[o.id]){const sv = lire('mue-sauvegardes', []);sv.push({date:new Date().toISOString(), carnet:CARNETS[o.id]});ecrire('mue-sauvegardes', sv.slice(-5))}
+  const c = JSON.parse(JSON.stringify(o));delete c.exporte;c.importe = new Date().toISOString();c.maj = Date.now();c.code = await empreinte(c.id, code.trim());
+  c.listes = c.listes || {};c.envois = c.envois || [];c.motsClasse = c.motsClasse || [];c.e.forEach(x => {x.tests = x.tests || {};x.niv = x.niv || {};x.echelle = x.echelle || {};x.afl = x.afl || {rep:'', role:''};x.ajust = x.ajust || []});
+  CARNETS[c.id] = c;if(!ecrire(CLE, CARNETS))return;IMPORT = null;fermerFen();rendre();toast('Carnet récupéré : ouvre-le avec votre code.');
 }
 
 /* ================== Démo ================== */
@@ -893,11 +1115,11 @@ document.addEventListener('toggle', ev => {const d = ev.target;if(d.dataset && d
 document.addEventListener('click', async ev => {
   const t = ev.target.closest('button,[data-fond]');if(!t)return;
   if(t.matches('[data-fond]')){if(ev.target === t)fermerFen();return}
-  const d = t.dataset;
+  const d = t.dataset;ANCRE = t;
   if(d.onglet){ONGLET = d.onglet;rendre();window.scrollTo(0, 0);return}
   if(d.qui != null){P = +d.qui;rendre();return}
   if(d.seance){SEANCE = d.seance;rendre();window.scrollTo(0, 0);return}
-  if(d.ouvrir){ouvrir(d.ouvrir);return}
+  if(d.carnet){ouvrir(d.carnet);return}
   if(d.selclasse){SEL = {classe:d.selclasse, noms:[]};rendre();return}
   if(d.selnom){const i = SEL.noms.indexOf(d.selnom);i < 0 ? (SEL.noms.length < 3 ? SEL.noms.push(d.selnom) : toast('3 élèves au maximum.')) : SEL.noms.splice(i, 1);rendre();return}
   if(d.note && d.cle){const o = d.cle === 'echelle' ? null : objetCle(d.cle, true);if(o){o.note = +d.note;apresRessenti(d.cle)}T ? rendreTest() : rendre();return}
@@ -928,7 +1150,8 @@ document.addEventListener('click', async ev => {
   if(d.crp){CALC.rp = Math.min(10, Math.max(3, +CALC.rp + +d.crp));rendreCalc();return}
   if(d.cp){CALC.p = +d.cp;rendreCalc();return}
   if(d.wc){const k = d.wc, on = (sea(EL(), SEANCE).ech || {}).wc, etait = !!(on && on.includes(k));
-    B.e.forEach(e => {const x = sea(e, SEANCE);x.ech = x.ech || {};x.ech.wc = x.ech.wc || [];const i = x.ech.wc.indexOf(k);if(etait && i >= 0)x.ech.wc.splice(i, 1);else if(!etait && i < 0)x.ech.wc.push(k)});
+    {const x = sea(EL(), SEANCE);x.ech = x.ech || {};x.ech.wc = x.ech.wc || [];const i = x.ech.wc.indexOf(k);if(etait && i >= 0)x.ech.wc.splice(i, 1);else if(!etait && i < 0)x.ech.wc.push(k);
+     if(k === 'P3' && !etait && !x.ech.wc.includes('gainage'))x.ech.wc.push('gainage')}
     sauver();rendre();return}
   if(d.wtim){wTimer(+d.wtim);return}
   if(d.wta === 'stop'){if(WT){clearInterval(WT.i);WT = null}const w = $('wtimer');if(w)w.hidden = true;return}
@@ -936,7 +1159,15 @@ document.addEventListener('click', async ev => {
   if(d.ech){ouvrirEchauf(d.ech);return}
   if(d.test){ouvrirTest(d.test);return}
   if(d.direct){saisieDirecte(d.direct);return}
-  if(d.tcharge){const p = chargesPossibles(atelier(T.at).support), c = +d.tcharge > 0 ? p.find(x => x >= T.charge + T.pas - 1e-9) : [...p].reverse().find(x => x <= T.charge - T.pas + 1e-9);if(c != null)T.charge = c;rendreTest();return}
+  if(d.tdisq){const sp = SUPPORTS[atelier(T.at).support];T.charge = Math.max(sp.vide, +(T.charge + 2 * +d.tdisq).toFixed(1));rendreTest();return}
+  if(d.tfix){const p = chargesPossibles(atelier(T.at).support), k = p.indexOf(T.charge), n = p[Math.max(0, Math.min(p.length - 1, (k < 0 ? 0 : k) + +d.tfix))];if(n != null)T.charge = n;rendreTest();return}
+  if(d.treserve){T.reserve = d.treserve;T.charge = monteeConseillee(atelier(T.at).support, T.base, d.treserve);rendreTest();return}
+  if(d.seq){const sq = etatSeq(EL(), SEANCE), L = sequences(+SEANCE.slice(1)), cur = seqOuverte(L, sq);sq.ouv = cur === d.seq ? '' : d.seq;sauver();rendre();return}
+  if(d.seqfin){if(d.conf && !confirm(d.conf))return;const sq = etatSeq(EL(), SEANCE), L = sequences(+SEANCE.slice(1));sq.fini[d.seqfin] = jour();
+    const i = L.findIndex(x => x.k === d.seqfin), nx = L.slice(i + 1).concat(L.slice(0, i)).find(x => !sq.fini[x.k]);sq.ouv = nx ? nx.k : '';ANCRE = null;sauver();rendre();
+    const z = $('seq-' + (nx ? nx.k : d.seqfin));if(z){z.scrollIntoView({block:'start'});window.scrollBy(0, -70)}toast(nx ? 'Séquence terminée ✓ Suite : ' + nx.t : 'Toutes les séquences sont terminées ✓');return}
+  if(d.bil){const s = sea(EL(), SEANCE), b = s.bilan = s.bilan || {};b[d.bil] = b[d.bil] === d.v ? '' : d.v;if(d.bil === 'reg' && !['plus', 'moins'].includes(b.reg))delete b.sur;b.date = jour();sauver();rendre();return}
+  if(d.abs != null){const x = B.e[+d.abs];x.abs = x.abs || {};if(x.abs[SEANCE])delete x.abs[SEANCE];else x.abs[SEANCE] = jour();sauver();rendre();return}
   if(d.equipe){B.equipe = d.equipe;sauver();rendre();return}
   if(d.niv != null && d.at){EL().niv[d.at] = +d.niv;sauver();rendre();return}
   if(d.fait){const p = prevuDe(EL(), SEANCE, d.fait), s = sea(EL(), SEANCE);s.exos = s.exos || {};const ex = s.exos[d.fait] = s.exos[d.fait] || {};
@@ -974,6 +1205,7 @@ document.addEventListener('click', async ev => {
     case 'valTirage': {const e = EL(), l = e.tirageMan || [];if(l.length !== 3)return toast('Choisis exactement 3 exercices.');e.tirage = {l:l.slice(), src:'manuel', date:jour()};sauver();rendre();break}
     case 'refaireTirage': if(confirm('Effacer le tirage enregistré ?')){delete EL().tirage;EL().tirageMan = [];sauver();rendre()}break;
     case 'chronoBinome': choixBinome();break;
+    case 'copierEch': {const src = (sea(EL(), SEANCE).ech || {}).wc || [], aut = autre();if(!aut)break;const x = sea(aut, SEANCE);x.ech = x.ech || {};x.ech.wc = [...new Set((x.ech.wc || []).concat(src))];sauver();toast('Coches copiées pour ' + prenom(aut.nom));rendre();break}
     case 'goBinome': lancerBinome();break;
     case 'calcUtiliser': CALC.cm = +d.cm;CALC.mode = 'pct';rendreCalc();break;
     case 'fichesLibres': FICHES_LIBRES = true;rendre();window.scrollTo(0, 0);break;
@@ -990,17 +1222,20 @@ document.addEventListener('click', async ev => {
       if(!se || !rp)return toast('Séries et répétitions.');if(!a.temps && rp < 3)return toast('Jamais moins de 3 répétitions.');
       ex.real = {series:se, reps:rp, charge:ch, niv:p.niv, diff:true};sauver();fermerFen();rendre();break}
     case 'valDirect': {const ch = num($('dCh').value), rp = parseInt($('dRp').value, 10), cm = brzycki(ch, rp);if(!cm){$('dRes').textContent = 'Une charge et 3 à 10 répétitions.';return}
-      if(rmVerrou(EL()))return toast('Charges max bloquées pendant l\'évaluation (S9).');majRM(EL(), d.at, {cm, charge:ch, reps:rp, date:jour(), mode:'direct'});sauver();fermerFen();rendre();toast('Charge max : ' + fmtKg(cm));break}
+      if(rmVerrou(EL()))return toast('Charges max bloquées pendant l\'évaluation (S9).');majRM(EL(), d.at, {cm, charge:ch, reps:rp, dix:rp === 10 ? ch : null, date:jour(), mode:'direct', S:SEANCE});sauver();fermerFen();rendre();toast((rp === 10 ? '10 RM : ' + fmtKg(ch) + ' · ' : '') + 'charge max estimée ' + fmtKg(cm));break}
     case 'annulerTest': if(T.series.length && !confirm('Quitter le test sans enregistrer ?'))return;T = null;rendreTest();rendre();break;
     case 'tPlus': T.cpt++;T.suite = 0;if(T.cpt >= 10)finSerie();else rendreTest();break;
     case 'tNo': T.norep++;T.suite++;if(T.suite >= 2)finSerie();else rendreTest();break;
     case 'tFinSerie': finSerie();break;
     case 'tSuivante': T.phase = 'serie';rendreTest();break;
+    case 'tStop': T.phase = 'fin';rendreTest();break;
     case 'tValider': validerTest();break;
     case 'tRecommencer': {const p = chargesPossibles(atelier(T.at).support), c = [...p].reverse().find(x => x <= T.charge - 2 * T.pas + 1e-9);T.series = [];T.cpt = 0;T.norep = 0;T.phase = 'serie';if(c != null)T.charge = c;rendreTest();break}
     case 'changerMobile': if(confirm('Changer de mobile ? Tes exercices restent, leurs paramètres sont remis au milieu des fourchettes du nouveau mobile.')){const pr = EL().projet, ord = MOBILES_ORDRE, m = ord[(ord.indexOf(pr.mob) + 1) % 3];
       fenetre(`<h3>Nouveau mobile</h3><div class="mob-choix">${ord.map(k => `<button type="button" style="--mc:${MOBILES[k].coul}" data-chg-mob="${k}"><img src="${MOB_IMG[k]}" alt=""><span>${MOBILES[k].nom}</span></button>`).join('')}</div><button type="button" class="bt" data-act="fermerFen">Annuler</button>`)}break;
     case 'exporter': exporter();break;
+    case 'importer': choisirImport();break;
+    case 'valImport': validerImport();break;
     case 'partager': partager();break;
     case 'fermerCarnet': B = null;DEMO = false;rendre();break;
     case 'supprimer': if(DEMO){B = null;DEMO = false;rendre();break}
@@ -1010,8 +1245,9 @@ document.addEventListener('click', async ev => {
   if(d.chgMob){const pr = EL().projet;pr.mob = d.chgMob;const dp = DEF_PARAM[d.chgMob];pr.exos.forEach(x => Object.assign(x, {pct:dp.pct, series:dp.series, reps:dp.reps}));sauver();fermerFen();rendre()}
 });
 document.addEventListener('change', ev => {
-  const t = ev.target, d = t.dataset;
+  const t = ev.target, d = t.dataset;ANCRE = t;
   if(d.texte === 'choix'){const e = EL();e.choix = Object.assign(e.choix || {}, {pourquoi:t.value.trim()});sauver();return}
+  if(d.biltxt){const s = sea(EL(), SEANCE), b = s.bilan = s.bilan || {};b[d.biltxt] = t.value.trim();sauver();return}
   if(d.texte === 'analyse'){sea(EL(), SEANCE).analyse = t.value.trim();sauver();return}
   if(d.echelle){EL().echelle[d.echelle] = t.value;sauver();return}
   if(d.pq){const x = sea(EL(), SEANCE).exos[d.pq];if(x){x.next = Object.assign(x.next || {}, {pq:t.value.trim()});sauver()}return}
@@ -1033,7 +1269,7 @@ window.addEventListener('eps-avant-maj', () => sauver());
 /* ---------- Code du cours (eps-code.js) : la saisie d'une séance n'est ouverte qu'en cours ---------- */
 if(window.EPSCode)EPSCode.eleve({app:'mue', classe:() => B && !DEMO ? B.classe || '' : '', seance:() => SEANCE, seances:() => SEANCES_IDS,
   nom:x => x + ' · ' + (seanceById(x) || {titre:''}).titre, ouvrir:x => {SEANCE = x;ONGLET = 'seance';rendre()}, zone:'#main',
-  actif:() => !!B && ONGLET === 'seance', libreSel:'.puces button,.qui button,[data-fiche],[data-poster],[data-ech],[data-libre],details summary,[data-act="mobiles"]', demo:() => DEMO, bandeau:true});
+  actif:() => !!B && ONGLET === 'seance', libreSel:'.seq-tete,.titre-fiche,.protocole summary,.puces button,.qui button,[data-fiche],[data-poster],[data-ech],[data-libre],details summary,[data-act="mobiles"]', demo:() => DEMO, bandeau:true});
 
 /* ---------- Démarrage ---------- */
 if(/[?&]demo\b/.test(location.search)){DEMO = true;B = binomeDemo();SEANCE = 'S5'}
