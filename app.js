@@ -27,7 +27,7 @@ let ONGLET = 'seance';
 let FICHES_LIBRES = false;   // v2.6 : onglet Fiches consultable depuis l'accueil, sans carnet
 let SEANCE = 'S1';
 let DEMO = false;
-const ONGLETS = [['seance','🏋️','Séance'],['charges','⚖️','Charges'],['projet','🎯','Projet'],['carnet','📒','Carnet'],['fiches','📖','Fiches'],['envoyer','📤','Envoyer']];
+const ONGLETS = [['seance','🏋️','Séance'],['charges','⚖️','Charges max'],['projet','🎯','Projet'],['carnet','📒','Carnet'],['fiches','📖','Fiches'],['envoyer','📤','Envoyer']];
 const SEANCES_IDS = SEANCES.map(s => s.id);
 /* v2.0 : S2-S3 tests, S4 tonification, S5 volume, S6 puissance et choix, S7 projet, S8-S9 évaluation */
 const MOBILE_DU_JOUR = {S4:'tonif', S5:'volume', S6:'puiss'};
@@ -645,26 +645,48 @@ function carteAfl(){
 /* ================== Vue : charges ================== */
 function vueCharges(){
   const e = EL(), ats = ATELIERS.filter(a => a.menu), nb = ats.filter(a => e.rm[a.id]).length;
-  return `<h2>Mes charges · ${esc(prenom(e.nom))}</h2><p class="retour ${nb >= OBJ_TESTS[0] ? 'ok' : 'non'}"><b>${nb} / ${ats.length}</b> charges max · objectif ${OBJ_TESTS[0]} à ${OBJ_TESTS[1]} à la fin de la S3. Un atelier sans charge max ne peut pas entrer dans ton projet.</p>
-   <section class="carte"><p class="small">${rmVerrou(e) ? '🔒 <b>Évaluation en cours (S8-S9)</b> : les charges max ne bougent plus.' : 'Tu as progressé ? Touche <b>Modifier</b> avec une série réussie proprement (3 à 10 répétitions). L\'ancienne valeur reste dans l\'historique.'}</p><table class="tb"><tr><th>Atelier</th><th>Charge max</th><th></th></tr>${ats.map(a => {const r = e.rm[a.id], h = r && r.hist && r.hist.length ? r.hist : null;return `<tr><td>${esc(a.nom)} <span class="small muted">${esc(a.groupe)}</span></td><td>${r ? `${h ? `<span class="small muted">${h.map(x => fmtKg(x.cm)).join(' → ')} →</span> ` : ''}<b>${fmtKg(r.cm)}</b>${h && r.cm > h[0].cm ? ` <b class="okc">+${Math.round(100 * (r.cm / h[0].cm - 1))} %</b>` : ''}<br><span class="small muted">${esc(MODE_RM[r.mode] || r.mode)} · ${esc(r.date)}</span>` : '—'}</td><td><button type="button" class="bt mini" data-calc="${a.id}"${r ? '' : ' disabled'}>%</button> <button type="button" class="bt mini" data-direct="${a.id}"${rmVerrou(e) ? ' disabled' : ''}>${r ? 'Modifier' : '✏️ Saisir'}</button></td></tr>`}).join('')}</table></section>
-   <section class="carte info"><h3>🧮 Calculette libre</h3><p class="small">Tape une charge max et choisis le matériel : l'appli donne les charges de 30 à 80 % et les disques à mettre.</p><button type="button" class="bt" data-act="calcLibre">Ouvrir la calculette</button></section>`;
+  return `<h2>Mes charges max · ${esc(prenom(e.nom))}</h2><p class="retour ${nb >= OBJ_TESTS[0] ? 'ok' : 'non'}"><b>${nb} / ${ats.length}</b> charges max · objectif ${OBJ_TESTS[0]} à ${OBJ_TESTS[1]} à la fin de la S3. Un atelier sans charge max ne peut pas entrer dans ton projet.</p>
+   <section class="carte"><p class="small">${rmVerrou(e) ? '🔒 <b>Évaluation en cours (S8-S9)</b> : les charges max ne bougent plus.' : 'Tu as progressé ? Touche <b>Modifier</b> avec une série réussie proprement (3 à 10 répétitions). L\'ancienne valeur reste dans l\'historique.'}</p><table class="tb"><tr><th>Atelier</th><th>Charge max</th><th></th></tr>${ats.map(a => {const r = e.rm[a.id], h = r && r.hist && r.hist.length ? r.hist : null;return `<tr><td>${esc(a.nom)} <span class="small muted">${esc(a.groupe)}</span>${imgAtelier(a.id) ? `<br><img class="ch-vign" src="${imgAtelier(a.id)}" alt="" loading="lazy">` : ''}</td><td>${r ? `${h ? `<span class="small muted">${h.map(x => fmtKg(x.cm)).join(' → ')} →</span> ` : ''}<b>${fmtKg(r.cm)}</b>${h && r.cm > h[0].cm ? ` <b class="okc">+${Math.round(100 * (r.cm / h[0].cm - 1))} %</b>` : ''}<br><span class="small muted">${esc(MODE_RM[r.mode] || r.mode)} · ${esc(r.date)}</span>` : '—'}</td><td><button type="button" class="bt mini" data-calc="${a.id}"${r ? '' : ' disabled'}>%</button> <button type="button" class="bt mini" data-direct="${a.id}"${rmVerrou(e) ? ' disabled' : ''}>${r ? 'Modifier' : '✏️ Saisir'}</button></td></tr>`}).join('')}</table></section>
+   <section class="carte info calc-pub"><h3>🧮 Calculette</h3><p class="small">① Ta charge max → la charge à mettre pour chaque pourcentage, disques compris.<br>② Une série (tant de kilos × tant de répétitions) → ta charge max.</p><button type="button" class="bt act pleine" data-act="calcLibre">Ouvrir la calculette</button></section>`;
 }
 function tableauCharges(sup, cm){
   return `<table class="tb"><tr><th>%</th><th>Charge réelle</th><th>Mobile</th></tr>${[30,40,50,55,60,65,70,75,80].map(p => {const r = chargeReelle(sup, cm * p / 100), mobs = MOBILES_ORDRE.filter(k => p >= MOBILES[k].pct[0] && p <= MOBILES[k].pct[1]);
     return `<tr><td><b>${p} %</b></td><td>${r ? `<b>${fmtKg(r.charge)}</b><br><span class="small muted">${esc(r.compo)}</span>` : '—'}</td><td>${mobs.map(k => `<span style="color:${MOBILES[k].coul};font-weight:700">${MOBILES[k].court}</span>`).join(' ')}</td></tr>`}).join('')}</table>`;
 }
-function calcAtelier(at){const a = atelier(at), cm = cmDe(EL(), at);fenetre(`<div class="rangee" style="justify-content:space-between"><h3>${esc(a.nom)} · ${fmtKg(cm)}</h3><button type="button" class="bt mini" data-act="fermerFen">Fermer</button></div>${tableauCharges(a.support, cm)}`)}
-function calcLibre(){
-  fenetre(`<div class="rangee" style="justify-content:space-between"><h3>🧮 Calculette</h3><button type="button" class="bt mini" data-act="fermerFen">Fermer</button></div>
-   <label class="ch">Charge max (kg)</label><input type="number" inputmode="decimal" id="lCm">
-   <p class="small">ou une série réussie : <input type="number" inputmode="decimal" id="lCh" placeholder="charge" style="width:110px;display:inline-block"> kg × <input type="number" inputmode="numeric" id="lRp" placeholder="rép." style="width:90px;display:inline-block"></p>
-   <label class="ch">Matériel</label><select id="lSup">${Object.entries(SUPPORTS).filter(([k, s]) => s.disques || s.fixes).map(([k, s]) => `<option value="${k}">${esc(s.nom)}</option>`).join('')}</select><div id="lRes" style="margin-top:10px"></div>`);
+function calcAtelier(at){calcLibre(at)}
+/* v3.7 : calculette modernisée : 2 modes (charge max → %, série → charge max), atelier ou matériel, curseur de % */
+let CALC = {mode:'pct', at:'', sup:'hreg', cm:'', ch:'', rp:8, p:60};
+function calcLibre(at){
+  const e = B ? EL() : null;
+  if(at){CALC.at = at;CALC.sup = atelier(at).support;const cm = e && cmDe(e, at);if(cm)CALC.cm = cm;CALC.mode = 'pct'}
+  fenetre(`<div class="calc"><div class="rangee" style="justify-content:space-between"><h3>🧮 Calculette</h3><button type="button" class="bt mini" data-act="fermerFen">Fermer</button></div><div id="calcZ"></div></div>`);
+  rendreCalc();
 }
-function majCalcLibre(){
-  const z = $('lRes');if(!z)return;let cm = num($('lCm').value);const ch = num($('lCh').value), rp = parseInt($('lRp').value, 10);
-  if(ch && rp){const b = brzycki(ch, rp);if(b){cm = b;$('lCm').value = b}else{z.innerHTML = '<p class="small muted">Entre 3 et 10 répétitions.</p>';return}}
-  z.innerHTML = cm > 0 ? tableauCharges($('lSup').value, cm) : '<p class="small muted">Tape une charge max.</p>';
+function rendreCalc(){
+  const z = $('calcZ');if(!z)return;const e = B ? EL() : null;
+  const ats = ATELIERS.filter(a => a.menu && a.type === 'charge');
+  const supOk = Object.entries(SUPPORTS).filter(([k, s]) => s.disques || s.fixes);
+  const onglets = `<div class="calc-seg"><button type="button" class="${CALC.mode === 'pct' ? 'ici' : ''}" data-calcmode="pct">① J'ai ma charge max</button><button type="button" class="${CALC.mode === 'cm' ? 'ici' : ''}" data-calcmode="cm">② Trouver ma charge max</button></div>`;
+  const choixAt = `<label class="ch">Atelier</label><select id="cAt"><option value="">— Matériel libre —</option>${ats.map(a => `<option value="${a.id}"${CALC.at === a.id ? ' selected' : ''}>${esc(a.nom)}${e && e.rm[a.id] ? ' · ' + fmtKg(e.rm[a.id].cm) : ''}</option>`).join('')}</select>
+    ${CALC.at ? `<p class="small muted">${esc(SUPPORTS[CALC.sup].nom)}${SUPPORTS[CALC.sup].unite ? ' · ' + esc(SUPPORTS[CALC.sup].unite) : ''}</p>` : `<label class="ch">Matériel</label><select id="cSup">${supOk.map(([k, s]) => `<option value="${k}"${CALC.sup === k ? ' selected' : ''}>${esc(s.nom)}</option>`).join('')}</select>`}`;
+  let corps = '';
+  if(CALC.mode === 'cm'){
+    const ch = num(CALC.ch), rp = +CALC.rp, cm = ch && brzycki(ch, rp);
+    corps = `<div class="calc-serie"><div><label class="ch">Charge soulevée (kg)</label><input class="calc-gros" type="number" inputmode="decimal" id="cCh" value="${CALC.ch}" placeholder="ex. 20"></div>
+      <div><label class="ch">Répétitions réussies</label><div class="calc-pas"><button type="button" data-crp="-1">−</button><b>${rp}</b><button type="button" data-crp="1">+</button></div></div></div>
+      <div class="calc-res">${cm ? `<span>Ta charge max estimée</span><b>${fmtKg(cm)}</b><small>${fmtKg(ch)} × ${rp} rép. → ${fmtKg(ch)} × 36 ÷ (37 − ${rp})</small><button type="button" class="bt act" data-act="calcUtiliser" data-cm="${cm}">Voir mes charges à chaque % →</button>` : `<span>Entre une charge et 3 à 10 répétitions</span>`}</div>
+      <p class="small muted">Plus la série est courte (3 à 6 répétitions), plus l'estimation est juste. Au-delà de 10, elle n'est plus fiable.</p>`;
+  } else {
+    const cm = num(CALC.cm), p = +CALC.p, r = cm > 0 ? chargeReelle(CALC.sup, cm * p / 100) : null, mob = MOBILES_ORDRE.filter(k => p >= MOBILES[k].pct[0] && p <= MOBILES[k].pct[1]);
+    corps = `<label class="ch">Ma charge max (kg)</label><input class="calc-gros" type="number" inputmode="decimal" id="cCm" value="${CALC.cm}" placeholder="ex. 30">
+      ${cm > 0 ? `<div class="calc-res" id="cRes"><span>À <b>${p} %</b>${mob.length ? ' · ' + mob.map(k => `<i style="background:${MOBILES[k].coul}">${MOBILES[k].nom}</i>`).join(' ') : ''}</span><b>${r ? fmtKg(r.charge) : '—'}</b>${r ? `<small>${esc(r.compo)}</small>` : ''}</div>
+      <input type="range" id="cP" min="30" max="85" step="5" value="${p}" class="calc-curseur" aria-label="Pourcentage">
+      <div class="calc-grille">${[40,50,55,60,65,70,75,80].map(q => {const x = chargeReelle(CALC.sup, cm * q / 100), mb = MOBILES_ORDRE.filter(k => q >= MOBILES[k].pct[0] && q <= MOBILES[k].pct[1]);
+        return `<button type="button" class="${q === p ? 'ici' : ''}" data-cp="${q}" style="--mc:${mb.length ? MOBILES[mb[0]].coul : '#94a3b8'}"><span>${q} %</span><b>${x ? fmtKg(x.charge) : '—'}</b><small>${mb.map(k => MOBILES[k].court).join(' · ')}</small></button>`}).join('')}</div>` : '<div class="calc-res"><span>Tape ta charge max, ou calcule-la avec ②</span></div>'}`;
+  }
+  z.innerHTML = onglets + choixAt + corps;
 }
+function majCalcLibre(){rendreCalc()}
 
 /* ================== Vue : projet ================== */
 function controleProjet(pr){
@@ -795,6 +817,9 @@ document.addEventListener('click', async ev => {
   if(d.situe){const e = EL();e.situe = e.situe || {};if(d.multi){const l = e.situe[d.situe] = e.situe[d.situe] || [];const i = l.indexOf(d.v);i < 0 ? l.push(d.v) : l.splice(i, 1)}else e.situe[d.situe] = d.v;sauver();rendre();return}
   if(d.fiche){ouvrirFiche(d.fiche);return}
   if(d.chrono){lancerChrono(d.chrono);return}
+  if(d.calcmode){CALC.mode = d.calcmode;rendreCalc();return}
+  if(d.crp){CALC.rp = Math.min(10, Math.max(3, +CALC.rp + +d.crp));rendreCalc();return}
+  if(d.cp){CALC.p = +d.cp;rendreCalc();return}
   if(d.wc){const k = d.wc, on = (sea(EL(), SEANCE).ech || {}).wc, etait = !!(on && on.includes(k));
     B.e.forEach(e => {const x = sea(e, SEANCE);x.ech = x.ech || {};x.ech.wc = x.ech.wc || [];const i = x.ech.wc.indexOf(k);if(etait && i >= 0)x.ech.wc.splice(i, 1);else if(!etait && i < 0)x.ech.wc.push(k)});
     sauver();rendre();return}
@@ -836,6 +861,7 @@ document.addEventListener('click', async ev => {
     case 'demo': DEMO = true;B = binomeDemo();P = 0;ONGLET = 'seance';SEANCE = 'S5';rendre();window.scrollTo(0, 0);break;
     case 'quitterDemo': DEMO = false;B = null;rendre();break;
     case 'mobiles': panneauMobiles();break;
+    case 'calcUtiliser': CALC.cm = +d.cm;CALC.mode = 'pct';rendreCalc();break;
     case 'fichesLibres': FICHES_LIBRES = true;rendre();window.scrollTo(0, 0);break;
     case 'fichesRetour': FICHES_LIBRES = false;rendre();window.scrollTo(0, 0);break;
     case 'calcLibre': calcLibre();break;
@@ -879,8 +905,12 @@ document.addEventListener('change', ev => {
   if(t.classList.contains('rSR') && d.cle){const o = objetCle(d.cle, true);o.note = +t.value;apresRessenti(d.cle);T ? rendreTest() : rendre();return}
   if(t.id === 'ajEx' && t.value){const pr = EL().projet, a = atelier(t.value), dp = DEF_PARAM[pr.mob];pr.exos.push({at:t.value, series:dp.series, reps:dp.reps, pct:dp.pct, niv:a.niveaux ? Math.min(1, a.niveaux.length - 1) : null});sauver();rendre();return}
   if(t.id === 'lSup')majCalcLibre();
+  if(t.id === 'cAt'){CALC.at = t.value;if(t.value){CALC.sup = atelier(t.value).support;const cm = B && cmDe(EL(), t.value);if(cm)CALC.cm = cm}rendreCalc()}
+  if(t.id === 'cSup'){CALC.sup = t.value;rendreCalc()}
 });
 document.addEventListener('input', ev => {if(['lCm', 'lCh', 'lRp'].includes(ev.target.id))majCalcLibre();
+  {const t = ev.target, z = () => {const p = t.selectionStart;rendreCalc();const n = $(t.id);if(n){n.focus();try{n.setSelectionRange(p, p)}catch(x){}}};
+   if(t.id === 'cCm'){CALC.cm = t.value;z()}else if(t.id === 'cCh'){CALC.ch = t.value;z()}else if(t.id === 'cP'){CALC.p = +t.value;const tmp = document.createElement('div');const sl = $('cP');sl.id = 'cPx';rendreCalc();const n = $('cP');n.replaceWith(sl);sl.id = 'cP'}}
   if(ev.target.classList.contains('rSR')){const v = +ev.target.value, w = ev.target.closest('.rS'), l = w.querySelector('.rS-l');w.classList.remove('vide');l.style.background = couleurNote(v);l.innerHTML = `<b>${v}</b><span>${esc(ECHELLE[v - 1][1])}<small>${esc(ECHELLE[v - 1][2])}</small></span>`;w.querySelectorAll('.rS-t span').forEach((x, i) => x.classList.toggle('on', i + 1 === v))}});
 document.addEventListener('keydown', ev => {if(ev.key === 'Enter' && ev.target.id === 'oCode'){const b = document.querySelector('[data-act="valCode"]');if(b)b.click()}});
 $('btMob').onclick = panneauMobiles;

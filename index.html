@@ -244,6 +244,26 @@ html.chrono-ouvert body{overflow:hidden}
 .mob-choix img{display:block;width:100%;aspect-ratio:3/4;object-fit:cover}
 .mob-choix span{display:block;padding:6px 4px}
 .mob-choix button.ici{border-color:var(--mc);box-shadow:0 0 0 3px var(--mc)}
+
+/* v3.7 : charges max et calculette */
+.ch-vign{width:64px;height:48px;object-fit:contain;background:#fff;border-radius:8px;margin-top:4px}
+.calc-seg{display:grid;grid-template-columns:1fr 1fr;gap:4px;background:#e2e8f0;border-radius:14px;padding:4px;margin:6px 0 10px}
+.calc-seg button{border:0;border-radius:10px;padding:10px 6px;font:inherit;font-weight:800;font-size:14px;background:none;color:#475569}
+.calc-seg button.ici{background:#fff;color:#365314;box-shadow:0 1px 4px rgba(0,0,0,.15)}
+.calc-gros{font:800 28px/1.2 "Archivo",system-ui,sans-serif!important;text-align:center;padding:10px!important}
+.calc-res{margin:12px 0;padding:14px;border-radius:16px;background:linear-gradient(135deg,#365314,#4d7c0f);color:#fff;text-align:center;display:flex;flex-direction:column;gap:4px;align-items:center}
+.calc-res b{font:900 44px/1.05 "Archivo",system-ui,sans-serif}.calc-res small{opacity:.9}
+.calc-res i{font-style:normal;font-size:12px;font-weight:800;padding:2px 8px;border-radius:999px;margin-left:2px}
+.calc-res .bt{margin-top:8px;background:#fff;color:#365314}
+.calc-curseur{width:100%;accent-color:#4d7c0f;height:32px}
+.calc-grille{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:6px}
+.calc-grille button{border:2px solid color-mix(in srgb,var(--mc) 40%,#fff);border-top:5px solid var(--mc);border-radius:12px;background:#fff;padding:6px 2px;font:inherit;display:flex;flex-direction:column;align-items:center;gap:1px}
+.calc-grille button span{font-size:12px;font-weight:800;color:#64748b}.calc-grille button b{font-size:16px}.calc-grille button small{font-size:10px;color:#64748b;min-height:12px}
+.calc-grille button.ici{background:color-mix(in srgb,var(--mc) 14%,#fff);outline:2px solid var(--mc)}
+.calc-serie{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:end}
+.calc-pas{display:flex;align-items:center;justify-content:space-between;border:1px solid var(--trait);border-radius:12px;padding:4px}
+.calc-pas button{width:48px;height:48px;border:0;border-radius:10px;background:#ecfccb;font:900 24px system-ui;color:#365314}.calc-pas b{font:900 28px "Archivo",system-ui}
+@media (max-width:380px){.calc-grille{grid-template-columns:repeat(2,1fr)}}
 </style>
 <style>/* Lisibilité terrain : textes à 15 px minimum à l'écran ; tailles d'origine à l'impression. */@media print{:root{--fs-min:0px}}</style>
 <link rel="stylesheet" href="eps-charte-v1.css">
