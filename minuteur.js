@@ -60,7 +60,7 @@ function ouvrir(o){
   function rendu(){
     const tete = `<div class="chm-tete"><div><b>${esc(o.nom)}</b><br><span>${esc(o.mobNom || '')}${o.chargeTxt ? ' · ' + esc(o.chargeTxt) : ''}</span></div>
       <div class="chm-bts"><button type="button" class="chm-mini" data-c="son">${libMode()}</button><button type="button" class="chm-mini" data-c="quitter">✕</button></div></div>`;
-    const pastilles = `<div class="chm-series">${Array.from({length:N}, (_, i) => `<span class="${i + 1 < serie || phase === 'fini' ? 'ok' : i + 1 === serie && phase !== 'fini' ? 'ici' : ''}">${i + 1}</span>`).join('')}</div>`;
+    const pastilles = `<div class="chm-series">${Array.from({length:N}, (_, i) => `<span class="${i + 1 < serie || phase === 'fini' || (phase === 'repos' && i + 1 === serie) ? 'ok' : i + 1 === serie || (phase === 'repos' && i === serie) ? 'ici' : ''}">${i + 1}</span>`).join('')}</div>`;
     let corps = '';
     if(phase === 'prep')corps = `<p class="chm-etat">Prêt ? Série ${serie}</p><div class="chm-temps chm-gros">${affTemps()}</div>`;
     else if(phase === 'serie')corps = `<p class="chm-etat serie">Série ${serie} / ${N} · ${o.temps ? esc(txt(o.reps)) + ' s' : esc(txt(o.reps)) + ' répétitions'}</p>
@@ -77,7 +77,9 @@ function ouvrir(o){
     else corps = `<p class="chm-etat ok">🎉 Exercice terminé : ${N} série${N > 1 ? 's' : ''}</p>
       <p class="chm-consigne">Note maintenant ton ressenti, et ton coach son avis.</p>
       ${o.onFait ? `<button type="button" class="chm-bt ok" data-c="fait">✓ Fait comme prévu</button>` : ''}<button type="button" class="chm-bt" data-c="quitter">Fermer</button>`;
-    div.innerHTML = `<div class="chm-in">${tete}${pastilles}${corps}</div>`;
+    div.className = 'chm ph-' + phase;
+    const ruban = {prep:'⏳ PRÊT ?', serie:'💪 TRAVAIL', repos:'⏸ REPOS', fini:'✓ TERMINÉ'}[phase];
+    div.innerHTML = `<div class="chm-ruban">${ruban}${phase === 'serie' ? `<small>série ${serie} / ${N}</small>` : phase === 'repos' ? `<small>prochaine série : ${serie + 1} / ${N}</small>` : ''}</div><div class="chm-in">${tete}${pastilles}${corps}</div>`;
     boucle();
   }
   div.addEventListener('toggle', ev => {if(ev.target.matches && ev.target.matches('.chm-coach'))voirCoach = ev.target.open}, true);
