@@ -120,7 +120,8 @@ function son(f, d){let m = 'sound';try{m = localStorage.getItem('eps_sound_mode'
   try{ac = ac || new (window.AudioContext || window.webkitAudioContext)();if(ac.state === 'suspended')ac.resume();const o = ac.createOscillator(), g = ac.createGain(), t = ac.currentTime;o.frequency.value = f;g.gain.setValueAtTime(.35, t);g.gain.exponentialRampToValueAtTime(.001, t + d);o.connect(g);g.connect(ac.destination);o.start(t);o.stop(t + d)}catch(e){}}
 async function eveil(on){try{if(on && navigator.wakeLock)lock = await navigator.wakeLock.request('screen');else if(lock){lock.release();lock = null}}catch(e){}}
 const CLE_TR = 'mue-transition';
-function lireTr(){try{const v = parseInt(localStorage.getItem(CLE_TR), 10);return isFinite(v) ? Math.max(0, Math.min(90, v)) : 20}catch(e){return 20}}
+const TR_DEFAUT = 60, TR_MAX = 120;   // v6.2 : 1 min pour changer les disques entre les deux élèves
+function lireTr(){try{const v = parseInt(localStorage.getItem(CLE_TR), 10);return isFinite(v) ? Math.max(0, Math.min(TR_MAX, v)) : TR_DEFAUT}catch(e){return TR_DEFAUT}}
 function ecrireTr(v){try{localStorage.setItem(CLE_TR, String(v))}catch(e){}}
 /* chiffre qui change chaque seconde : <span class="dyn">…</span> (la structure ne bouge pas) */
 const dyn = t => `<span class="dyn">${esc(t)}</span>`;
@@ -149,7 +150,7 @@ function binome(P, opts){
           ${s.faites === 0 && p.approche ? `<p class="chb-rap">🔸 Série d'approche avant : ${esc(p.approche)}</p>` : ''}
           ${tr > 0 ? `<p class="chb-rec">Temps pour changer les disques : <b>${dyn(mmss(tr))}</b></p>` : `<p class="chb-rec">${s.faites || i ? 'Barre prête ? Partenaire en place pour parer ?' : 'Barre chargée ? Partenaire en place ?'}</p>`}
           ${bloque ? `<p class="chb-att">⏸ Récupération obligatoire${p.bloque ? ' en ' + esc(p.mobNom || '') : ''} : encore ${dyn(mmss(r))}</p>` : attentionRec ? `<p class="chb-att">⚠️ Récupération conseillée : encore ${dyn(mmss(r))}</p>` : ''}
-          <div class="chb-tr"><span>Transition</span><button type="button" data-b="tr" data-v="-5" aria-label="moins 5 secondes">−5 s</button><b>${TR} s</b><button type="button" data-b="tr" data-v="5" aria-label="plus 5 secondes">+5 s</button></div>
+          <div class="chb-tr"><span>Transition</span><button type="button" data-b="tr" data-v="-10" aria-label="moins 10 secondes">−10 s</button><b>${TR} s</b><button type="button" data-b="tr" data-v="10" aria-label="plus 10 secondes">+10 s</button></div>
           <button type="button" class="chb-bt" data-b="pret"${bloque ? ' disabled' : ''}>${bloque ? 'Attends la fin de ta récupération' : '✋ JE SUIS PRÊT'}</button></section>`;
       }
       /* 2. décompte 3 s */
@@ -183,7 +184,7 @@ function binome(P, opts){
   div.addEventListener('click', ev => {const b = ev.target.closest('[data-b]');if(!b || b.disabled)return;const a = b.dataset.b;
     if(a === 'fin'){bascule();return}
     if(a === 'pret'){st[qui].depart = Date.now() + 3000;son(880, .12);rendu();return}
-    if(a === 'tr'){TR = Math.max(0, Math.min(90, TR + +b.dataset.v));ecrireTr(TR);rendu();return}
+    if(a === 'tr'){TR = Math.max(0, Math.min(TR_MAX, TR + +b.dataset.v));ecrireTr(TR);rendu();return}
     if(a === 'cle'){const o = +b.dataset.o;st[o].cle = st[o].cle === b.dataset.v ? null : b.dataset.v;rendu();return}
     if(a === 'ok'){fermer();opts.onFin && opts.onFin({cle:st.map(s => s.cle), faites:st.map(s => s.faites)});return}
     if(a === 'quit'){if(!(fini(0) && fini(1)) && !confirm('Quitter le chrono binôme ? Rien ne sera enregistré.'))return;fermer();return}
