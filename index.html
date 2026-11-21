@@ -215,6 +215,18 @@ html.chrono-ouvert body{overflow:hidden}
 .wcard.on{border-color:#16a34a;background:#f0fdf4}.wcard.on b::before{content:'✓ ';color:#16a34a}
 .wtimer{position:sticky;top:6px;z-index:5;display:flex;gap:10px;align-items:center;justify-content:center;background:#0f172a;color:#fff;border-radius:12px;padding:8px 12px;margin:6px 0}
 .wtimer #wtt{font:800 28px/1 "Archivo",system-ui,sans-serif;font-variant-numeric:tabular-nums}
+/* v3.2 : affiches des mobiles */
+.mob-img{float:right;width:34%;max-width:200px;margin:0 0 8px 12px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+.mob::after{content:"";display:block;clear:both}
+@media (max-width:420px){.mob-img{float:none;width:100%;max-width:none;margin:0 0 10px;aspect-ratio:4/3;object-fit:cover;object-position:50% 18%}}
+.mob-bandeau{position:relative;border-radius:16px;overflow:hidden;margin:10px 0;box-shadow:0 3px 12px rgba(0,0,0,.25)}
+.mob-bandeau img{display:block;width:100%;aspect-ratio:16/10;object-fit:cover;object-position:50% 4%}
+.mob-bandeau span{position:absolute;left:0;right:0;bottom:0;padding:8px 12px;color:#fff;font-weight:800;background:linear-gradient(transparent,rgba(0,0,0,.75))}
+.mob-choix{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:8px 0}
+.mob-choix button{border:3px solid transparent;border-radius:14px;padding:0;overflow:hidden;background:#111;color:#fff;font:inherit;font-weight:800;font-size:14px;cursor:pointer;text-align:center}
+.mob-choix img{display:block;width:100%;aspect-ratio:3/4;object-fit:cover}
+.mob-choix span{display:block;padding:6px 4px}
+.mob-choix button.ici{border-color:var(--mc);box-shadow:0 0 0 3px var(--mc)}
 </style>
 <style>/* Lisibilité terrain : textes à 15 px minimum à l'écran ; tailles d'origine à l'impression. */@media print{:root{--fs-min:0px}}</style>
 <link rel="stylesheet" href="eps-charte-v1.css">

@@ -482,7 +482,7 @@ async function afficherQRMots(){
   fenetre(`<h3>Mots${o.defi ? ' et défi' : ''} · ${SEANCE}</h3><div class="qr">${svgQR(txt)}</div><p class="small">${m.debut.length + m.fin.length} mot(s)${o.defi ? ` · équipe ${o.defi.e} : ${fmtKg(o.defi.kg)}, ${o.defi.q} pts de qualité` : SEANCE === 'S2' ? ' · ⚠️ choisis ton équipe pour le défi' : ''}</p><button type="button" class="bt pleine" data-act="fermerFen">Fermer</button>`);
 }
 /* ---------- Mobile du jour et exercices ---------- */
-function carteMobile(mob){return mob ? `<details class="carte"><summary>📋 Le mobile ${esc(MOBILES[mob].nom)} : paramètres et sensation attendue</summary>${mobileHTML(mob)}</details>` : ''}
+function carteMobile(mob){return mob ? `<div class="mob-bandeau"><img src="${MOB_IMG[mob]}" alt=""><span>${SEANCE_MOBILE[0] <= +SEANCE.slice(1) && +SEANCE.slice(1) <= SEANCE_MOBILE[1] ? 'Aujourd\'hui, je découvre le mobile' : 'Mon mobile'} ${esc(MOBILES[mob].nom)} · ${esc(MOBILES[mob].theme)}</span></div><details class="carte"><summary>📋 Le mobile ${esc(MOBILES[mob].nom)} : paramètres et sensation attendue</summary>${mobileHTML(mob)}</details>` : ''}
 function listeExos(ids, projet){
   const e = EL(), S = SEANCE, s = sea(e, S);s.exos = s.exos || {};
   if(!projet){const l = B.listes[S];if(l)ids = l}
@@ -586,7 +586,7 @@ function carteComparer(){
   return `<section class="carte act"><h3>Comparer et choisir · ${esc(prenom(e.nom))}</h3><table class="tb"><tr><th>Mobile</th><th>Note moyenne</th><th>Cohérent</th><th>Mes mots</th></tr>
    ${Object.keys(MOBILE_DU_JOUR).map(S => {const m = MOBILE_DU_JOUR[S], st = statsMobile(e, S);return `<tr><td><b style="color:${MOBILES[m].coul}">${MOBILES[m].nom}</b></td><td>${st ? st.moy : '—'}</td><td>${st ? st.ok + '/' + st.n : '—'}</td><td>${st ? esc(st.mots.join(', ')) : ''}</td></tr>`}).join('')}</table>
    ${e.situe && suggestion(e.situe) ? `<p class="small muted">En S1, « Je me situe » suggérait : ${MOBILES[suggestion(e.situe)].nom}.</p>` : ''}
-   <h4>Mon mobile pour le projet</h4><div class="chips">${MOBILES_ORDRE.map(m => `<button type="button" class="${c.mob === m ? 'ici' : ''}" data-choix="${m}">${MOBILES[m].nom} · ${MOBILES[m].theme}</button>`).join('')}</div>
+   <h4>Mon mobile pour le projet</h4><div class="mob-choix">${MOBILES_ORDRE.map(m => `<button type="button" class="${c.mob === m ? 'ici' : ''}" style="--mc:${MOBILES[m].coul}" data-choix="${m}"><img src="${MOB_IMG[m]}" alt=""><span>${c.mob === m ? '✓ ' : ''}${MOBILES[m].nom}</span></button>`).join('')}</div>
    <label class="ch" for="choixPq">Pourquoi ? Quelle sensation te le dit ?</label><textarea id="choixPq" data-texte="choix">${esc(c.pourquoi || '')}</textarea></section>`;
 }
 function carteEchelle(){
@@ -678,10 +678,11 @@ function controleProjet(pr){
 function vueProjet(){
   const e = EL(), pr = e.projet;
   if(!pr){const m = (e.choix && e.choix.mob) || null;
-    return `<h2>Mon projet · ${esc(prenom(e.nom))}</h2><section class="carte act"><p>Choisis ton mobile${m ? ` (en S6 tu as choisi : <b>${MOBILES[m].nom}</b>)` : ''} :</p><div class="chips">${MOBILES_ORDRE.map(k => `<button type="button" class="${m === k ? 'ici' : ''}" data-nouveau-projet="${k}">${MOBILES[k].nom}</button>`).join('')}</div></section>${MOBILES_ORDRE.map(mobileHTML).join('')}`}
+    return `<h2>Mon projet · ${esc(prenom(e.nom))}</h2><section class="carte act"><p>Choisis ton mobile${m ? ` (en S6 tu as choisi : <b>${MOBILES[m].nom}</b>)` : ''} :</p><div class="mob-choix">${MOBILES_ORDRE.map(k => `<button type="button" class="${m === k ? 'ici' : ''}" style="--mc:${MOBILES[k].coul}" data-nouveau-projet="${k}"><img src="${MOB_IMG[k]}" alt=""><span>${MOBILES[k].nom}</span></button>`).join('')}</div></section>${MOBILES_ORDRE.map(mobileHTML).join('')}`}
   const m = MOBILES[pr.mob], ctrl = controleProjet(pr);
   const dispo = dispoPour(pr.mob).filter(a => !pr.exos.some(x => x.at === a.id));
   return `<h2>Mon projet · ${esc(prenom(e.nom))}</h2>
+   <div class="mob-bandeau"><img src="${MOB_IMG[pr.mob]}" alt=""><span>Mon mobile : ${esc(m.nom)} · ${esc(m.theme)}</span></div>
    <section class="carte"><p>Mobile : <b style="color:${m.coul}">${m.nom}</b> (${m.theme}) · ${m.pct[0]}-${m.pct[1]} % · ${m.series[0]}-${m.series[1]} séries · ${m.reps[0]}-${m.reps[1]} rép. · récup ${m.recup}</p><button type="button" class="lien" data-act="changerMobile">changer de mobile</button></section>
    ${pr.exos.map((x, i) => {const a = atelier(x.at);return `<div class="ex"><header><b>${i + 1}. ${esc(a.nom)}</b><button type="button" class="bt mini danger" data-retirer="${i}">Retirer</button></header><p class="small muted">${esc(a.groupe)} · ${a.zone}</p>
      <div class="rangee">${pasHTML(i, 'series', x.series, 'séries')}${a.temps ? '' : pasHTML(i, 'reps', x.reps, 'rép.')}${a.type === 'charge' ? pasHTML(i, 'pct', x.pct, '%') : ''}</div>
@@ -698,7 +699,7 @@ function vueCarnet(){
   const e = EL();
   return `<h2>Carnet · ${esc(e.nom)}</h2>
    ${e.situe && suggestion(e.situe) ? `<p>Je me situe : mobile suggéré <b>${MOBILES[suggestion(e.situe)].nom}</b>.</p>` : ''}
-   ${e.choix && e.choix.mob ? `<p>Mobile choisi : <b>${MOBILES[e.choix.mob].nom}</b>${e.choix.pourquoi ? ' · « ' + esc(e.choix.pourquoi) + ' »' : ''}</p>` : ''}
+   ${e.choix && e.choix.mob ? `<div class="mob-bandeau"><img src="${MOB_IMG[e.choix.mob]}" alt=""><span>Mon mobile : ${esc(MOBILES[e.choix.mob].nom)}</span></div><p>Mobile choisi : <b>${MOBILES[e.choix.mob].nom}</b>${e.choix.pourquoi ? ' · « ' + esc(e.choix.pourquoi) + ' »' : ''}</p>` : ''}
    ${SEANCES_IDS.map(S => {const s = e.seances[S];if(!s || !Object.keys(s).length)return '';const ex = Object.entries(s.exos || {});
      return `<section class="carte"><h3>${S} · ${esc(seanceById(S).titre)}</h3>${s.forme ? `<p class="small">Forme : ${FORME[s.forme - 1][1]} ${FORME[s.forme - 1][2]}</p>` : ''}${s.ech && s.ech.pouls ? `<p class="small">Pouls d'échauffement : ${s.ech.pouls}</p>` : ''}
       ${ex.length ? `<table class="tb"><tr><th>Exercice</th><th>Réalisé</th><th>Ressenti</th></tr>${ex.map(([at, x]) => `<tr><td>${esc(atelier(at).nom)}</td><td>${x.real ? `${x.real.series}×${x.real.reps}${x.real.charge ? ' · ' + fmtKg(x.real.charge) : ''}` : '—'}</td><td>${x.ressenti && x.ressenti.note ? `${x.ressenti.note}${x.ressenti.mot ? ' · ' + esc(x.ressenti.mot) : ''} ${x.coh ? (x.coh.ok ? '✅' : '⚠️') : ''}` : '—'}</td></tr>`).join('')}</table>` : ''}
@@ -854,7 +855,7 @@ document.addEventListener('click', async ev => {
     case 'tValider': validerTest();break;
     case 'tRecommencer': {const p = chargesPossibles(atelier(T.at).support), c = [...p].reverse().find(x => x <= T.charge - 2 * T.pas + 1e-9);T.series = [];T.cpt = 0;T.norep = 0;T.phase = 'serie';if(c != null)T.charge = c;rendreTest();break}
     case 'changerMobile': if(confirm('Changer de mobile ? Tes exercices restent, leurs paramètres sont remis au milieu des fourchettes du nouveau mobile.')){const pr = EL().projet, ord = MOBILES_ORDRE, m = ord[(ord.indexOf(pr.mob) + 1) % 3];
-      fenetre(`<h3>Nouveau mobile</h3><div class="chips">${ord.map(k => `<button type="button" data-chg-mob="${k}">${MOBILES[k].nom}</button>`).join('')}</div><button type="button" class="bt" data-act="fermerFen">Annuler</button>`)}break;
+      fenetre(`<h3>Nouveau mobile</h3><div class="mob-choix">${ord.map(k => `<button type="button" style="--mc:${MOBILES[k].coul}" data-chg-mob="${k}"><img src="${MOB_IMG[k]}" alt=""><span>${MOBILES[k].nom}</span></button>`).join('')}</div><button type="button" class="bt" data-act="fermerFen">Annuler</button>`)}break;
     case 'exporter': exporter();break;
     case 'partager': partager();break;
     case 'fermerCarnet': B = null;DEMO = false;rendre();break;
