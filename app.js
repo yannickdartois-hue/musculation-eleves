@@ -24,9 +24,10 @@ let SEL = {classe:'', noms:[]};          // choix en cours pour un nouveau binô
 let B = null;          // carnet ouvert
 let P = 0;             // élève qui pratique (index dans B.e)
 let ONGLET = 'seance';
+let FICHES_LIBRES = false;   // v2.6 : onglet Fiches consultable depuis l'accueil, sans carnet
 let SEANCE = 'S1';
 let DEMO = false;
-const ONGLETS = [['seance','🏋️','Séance'],['charges','⚖️','Charges'],['projet','🎯','Projet'],['carnet','📒','Carnet'],['envoyer','📤','Envoyer']];
+const ONGLETS = [['seance','🏋️','Séance'],['charges','⚖️','Charges'],['projet','🎯','Projet'],['carnet','📒','Carnet'],['fiches','📖','Fiches'],['envoyer','📤','Envoyer']];
 const SEANCES_IDS = SEANCES.map(s => s.id);
 /* v2.0 : S2-S3 tests, S4 tonification, S5 volume, S6 puissance et choix, S7 projet, S8-S9 évaluation */
 const MOBILE_DU_JOUR = {S4:'tonif', S5:'volume', S6:'puiss'};
@@ -55,14 +56,14 @@ async function empreinte(id, code){
 /* ================== Rendu général ================== */
 function rendre(){
   const y = window.scrollY;
-  if(!B){$('nav').hidden = true;$('btMob').hidden = true;$('sous').textContent = 'Lycée Georges Pompidou · CA5 Terminale';$('main').innerHTML = accueil();return}
+  if(!B){$('nav').hidden = true;$('btMob').hidden = true;$('sous').textContent = 'Lycée Georges Pompidou · CA5 Terminale';$('main').innerHTML = FICHES_LIBRES ? `<button type="button" class="bt" data-act="fichesRetour" style="margin:4px 0 10px">← Retour</button>` + vueFiches() : accueil();return}
   $('sous').textContent = (B.classe ? B.classe + ' · ' : '') + B.e.map(x => prenom(x.nom)).join(' & ');
   $('nav').hidden = false;$('btMob').hidden = false;
   $('nav').innerHTML = ONGLETS.map(([k, i, t]) => `<button type="button" data-onglet="${k}" class="${k === ONGLET ? 'ici' : ''}"><i>${i}</i>${t}</button>`).join('');
   const qui = `<div class="qui"><span>Qui pratique ?</span>${B.e.map((x, i) => `<button type="button" data-qui="${i}" class="${i === P ? 'ici' : ''}">${esc(prenom(x.nom))}</button>`).join('')}</div>`;
   const demo = DEMO ? `<div class="demo-bandeau"><span>👀 <b>Mode démo</b> : rien n'est enregistré.</span><button type="button" class="bt mini" data-act="quitterDemo">Quitter</button></div>` : '';
-  const corps = {seance:vueSeance, charges:vueCharges, projet:vueProjet, carnet:vueCarnet, envoyer:vueEnvoyer}[ONGLET]();
-  $('main').innerHTML = demo + (ONGLET === 'envoyer' ? '' : qui) + corps;
+  const corps = {seance:vueSeance, charges:vueCharges, projet:vueProjet, carnet:vueCarnet, fiches:vueFiches, envoyer:vueEnvoyer}[ONGLET]();
+  $('main').innerHTML = demo + (ONGLET === 'envoyer' || ONGLET === 'fiches' ? '' : qui) + corps;
   window.scrollTo(0, y);
 }
 
@@ -71,6 +72,7 @@ function accueil(){
   const l = Object.values(CARNETS).sort((a, b) => (b.maj || 0) - (a.maj || 0));
   return `<h2>Mon carnet de musculation</h2>
   ${l.length ? `<section class="carte"><h3>Carnets sur ce téléphone</h3>${l.map(c => `<button type="button" class="bt pleine" style="margin:6px 0;justify-content:flex-start" data-ouvrir="${c.id}">🔒 ${esc(c.e.map(x => x.nom).join(' & '))}${c.classe ? ` <span class="muted small">· ${esc(c.classe)}</span>` : ''}</button>`).join('')}</section>` : ''}
+  <section class="carte"><h3>📖 Fiches d'exercice</h3><p class="small muted">Les fiches des ateliers et le répertoire de l'échauffement, en libre consultation.</p><button type="button" class="bt pleine" data-act="fichesLibres">Voir les fiches</button></section>
   <section class="carte"><h3>📷 QR de la classe</h3><p class="small muted">Scanne le QR affiché par le professeur : il donne la liste de la classe${Object.keys(CLASSES).length ? ' (classe' + (Object.keys(CLASSES).length > 1 ? 's' : '') + ' reçue' + (Object.keys(CLASSES).length > 1 ? 's' : '') + ' : ' + esc(Object.keys(CLASSES).join(', ')) + ')' : ''} et ouvre la séance du jour.</p><button type="button" class="bt act" data-act="scanClasse">📷 Scanner le QR de la classe</button></section>
   <section class="carte act"><h3>＋ Nouveau binôme</h3>${blocNouveau()}</section>
   <section class="carte"><h3>👀 Découvrir l'appli</h3><p class="small muted">Un binôme fictif déjà rempli, pour voir tous les écrans. Rien n'est enregistré.</p><button type="button" class="bt" data-act="demo">Essayer l'appli (démo)</button></section>
@@ -273,7 +275,27 @@ function ouvrirFiche(id){
   fenetre(`<div class="rangee" style="justify-content:space-between"><h3>${a.n ? a.n + '. ' : ''}${esc(a.nom)}</h3><button type="button" class="bt mini" data-act="fermerFen">Fermer</button></div>${im ? `<img class="illu" src="${im}" alt="${esc(a.nom)}">` : ''}
    <p class="small muted">${esc(a.muscles)} · ${esc(SUPPORTS[a.support].nom)}</p><h4>Placement</h4><ul class="ats">${a.crit.map(c => `<li>${esc(c)}</li>`).join('')}</ul><h4>Respiration</h4><p>${esc(a.resp)}</p><h4>Sécurité</h4><p>${esc(a.secu)}</p>
    ${a.niveaux ? `<h4>Niveaux</h4><ol class="ats">${a.niveaux.map(n => `<li>${esc(n)}</li>`).join('')}</ol>` : ''}${a.moins ? `<p class="small"><b>− Plus facile.</b> ${esc(a.moins)}</p>` : ''}${a.plus ? `<p class="small"><b>+ Plus difficile.</b> ${esc(a.plus)}</p>` : ''}
+   ${ficheImg(id) ? `<button type="button" class="bt pleine" data-poster="${id}" style="margin-top:10px">📖 Voir la fiche complète</button>` : ''}
    <button type="button" class="bt pleine" data-act="fermerFen" style="margin-top:10px">Fermer</button>`);
+}
+/* v2.6 : fiches d'exercice complètes et répertoire de l'échauffement */
+function ouvrirPoster(id){
+  const src = ficheImg(id);
+  fenetre(`<div class="rangee" style="justify-content:space-between"><h3>${esc(FICHES[id])}</h3><button type="button" class="bt mini" data-act="fermerFen">Fermer</button></div>
+   <a href="${src}" target="_blank" rel="noopener"><img class="poster" src="${src}" alt="Fiche : ${esc(FICHES[id])}"></a>
+   <p class="small muted">Touche la fiche pour l'ouvrir en grand et zoomer.</p><button type="button" class="bt pleine" data-act="fermerFen">Fermer</button>`);
+}
+function ouvrirEchauf(id){
+  let it = null;ECHAUF_LIB.forEach(g => g.l.forEach(x => {if(x[0] === id)it = x}));if(!it)return;
+  fenetre(`<div class="rangee" style="justify-content:space-between"><h3>${esc(it[1])}</h3><button type="button" class="bt mini" data-act="fermerFen">Fermer</button></div>
+   <img class="illu" src="${imgEchauf(id)}" alt="${esc(it[1])}"><p>${esc(it[2])}</p><button type="button" class="bt pleine" data-act="fermerFen">Fermer</button>`);
+}
+function vueFiches(){
+  const ids = Object.keys(FICHES);
+  return `<h2>📖 Fiches d'exercice</h2>
+   <section class="carte"><h3>Les ateliers</h3><p class="small muted">Touche une fiche pour l'ouvrir.</p><div class="fiches-grille">${ids.map(id => `<button type="button" class="fiche-vig" data-poster="${id}"><img src="${imgAtelier(id) || ficheImg(id)}" alt="" loading="lazy"><span>${esc(FICHES[id])}</span></button>`).join('')}</div>
+   <p class="small muted">Développé couché haltères, pull-over et oiseau : fiche en préparation (voir la fiche de l'atelier dans la séance).</p></section>
+   <h2>🔥 Échauffement</h2>${ECHAUF_LIB.map(g => `<section class="carte"><h3>${esc(g.t)}</h3><p class="small muted">${esc(g.i)}</p><div class="ech-liste">${g.l.map(([id, nom, txt]) => `<button type="button" class="ech-it" data-ech="${id}"><img src="${imgEchauf(id)}" alt="" loading="lazy"><span><b>${esc(nom)}</b><br><span class="small">${esc(txt)}</span></span></button>`).join('')}</div></section>`).join('')}`;
 }
 function ficheAtelier(a){
   const im = imgAtelier(a.id);
@@ -717,6 +739,8 @@ document.addEventListener('click', async ev => {
   if(d.circuit){const s = sea(EL(), 'S1');s.circuit = s.circuit || {};s.circuit[d.circuit] = !s.circuit[d.circuit];sauver();rendre();return}
   if(d.situe){const e = EL();e.situe = e.situe || {};if(d.multi){const l = e.situe[d.situe] = e.situe[d.situe] || [];const i = l.indexOf(d.v);i < 0 ? l.push(d.v) : l.splice(i, 1)}else e.situe[d.situe] = d.v;sauver();rendre();return}
   if(d.fiche){ouvrirFiche(d.fiche);return}
+  if(d.poster){ouvrirPoster(d.poster);return}
+  if(d.ech){ouvrirEchauf(d.ech);return}
   if(d.test){ouvrirTest(d.test);return}
   if(d.direct){saisieDirecte(d.direct);return}
   if(d.tcharge){const p = chargesPossibles(atelier(T.at).support), c = +d.tcharge > 0 ? p.find(x => x >= T.charge + T.pas - 1e-9) : [...p].reverse().find(x => x <= T.charge - T.pas + 1e-9);if(c != null)T.charge = c;rendreTest();return}
@@ -751,6 +775,8 @@ document.addEventListener('click', async ev => {
     case 'demo': DEMO = true;B = binomeDemo();P = 0;ONGLET = 'seance';SEANCE = 'S5';rendre();window.scrollTo(0, 0);break;
     case 'quitterDemo': DEMO = false;B = null;rendre();break;
     case 'mobiles': panneauMobiles();break;
+    case 'fichesLibres': FICHES_LIBRES = true;rendre();window.scrollTo(0, 0);break;
+    case 'fichesRetour': FICHES_LIBRES = false;rendre();window.scrollTo(0, 0);break;
     case 'calcLibre': calcLibre();break;
     case 'fermerFen': fermerFen();break;
     case 'valCode': validerCode(d.id);break;
@@ -802,7 +828,7 @@ window.addEventListener('eps-avant-maj', () => sauver());
 /* ---------- Code du cours (eps-code.js) : la saisie d'une séance n'est ouverte qu'en cours ---------- */
 if(window.EPSCode)EPSCode.eleve({app:'mue', classe:() => B && !DEMO ? B.classe || '' : '', seance:() => SEANCE, seances:() => SEANCES_IDS,
   nom:x => x + ' · ' + (seanceById(x) || {titre:''}).titre, ouvrir:x => {SEANCE = x;ONGLET = 'seance';rendre()}, zone:'#main',
-  actif:() => !!B && ONGLET === 'seance', libreSel:'.puces button,.qui button,[data-fiche],[data-libre],details summary,[data-act="mobiles"]', demo:() => DEMO, bandeau:true});
+  actif:() => !!B && ONGLET === 'seance', libreSel:'.puces button,.qui button,[data-fiche],[data-poster],[data-ech],[data-libre],details summary,[data-act="mobiles"]', demo:() => DEMO, bandeau:true});
 
 /* ---------- Démarrage ---------- */
 if(/[?&]demo\b/.test(location.search)){DEMO = true;B = binomeDemo();SEANCE = 'S5'}
