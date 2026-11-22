@@ -511,6 +511,7 @@ function choixBinome(){
    ${B.e.slice(0, 2).every(e => exosEleve(e).length) ? `<button type="button" class="bt act pleine" data-act="goBinome" style="margin-top:12px">▶ Lancer</button>` : ''}`);
 }
 function lancerBinome(){
+  if(window.EPSSifflet && EPSSifflet.choix() === null)return EPSSifflet.demander(lancerBinome);
   const E2 = B.e.slice(0, 2), ats = [$('cb0').value, $('cb1').value];fermerFen();
   const P = E2.map((e, i) => {const at = ats[i], a = atelier(at), p = prevuDe(e, SEANCE, at) || {}, M = MOBILES[p.mob] || {};
     const ch = p.charge && p.charge.charge ? fmtKg(p.charge.charge) : (a.niveaux && p.niv != null ? 'Niv. ' + (p.niv + 1) : '');
@@ -528,6 +529,7 @@ function lancerChrono(at){
   const e = EL(), a = atelier(at), p = prevuDe(e, SEANCE, at);if(!p)return toast('Pas de paramètres prévus pour cet exercice.');
   const M = MOBILES[p.mob] || {}, aut = autre();
   const ch = p.charge && p.charge.charge ? fmtKg(p.charge.charge) : (a.type === 'variante' && a.niveaux && p.niv != null ? 'Niv. ' + (p.niv + 1) : '');
+  if(window.EPSSifflet && EPSSifflet.choix() === null)return EPSSifflet.demander(() => lancerChrono(at));
   MinuteurM.ouvrir({at, nom:a.nom, img:imgAtelier(at), mob:p.mob, mobNom:M.nom, rappel:rappelMobile(p.mob), series:p.series, reps:p.reps, temps:!!a.temps, chargeTxt:ch,
     recupS:M.recupS || 90, approche:(approche(a, p) || {}).txt || '', cle:POINT_CLE[at] || '', crit:a.crit || [], signes:SIGNES, partenaire:aut ? prenom(aut.nom) : '',
     onFait:() => {const b = document.createElement('button');b.type = 'button';b.dataset.fait = at;b.hidden = true;document.body.appendChild(b);b.click();b.remove()}});
@@ -707,10 +709,10 @@ function meilleure(series){
 function finSerie(){
   T.series.push({charge:T.charge, valides:T.cpt, norep:T.norep});
   const ok = T.cpt >= 10;T.cpt = 0;T.norep = 0;T.suite = 0;
-  if(ok && T.series.length < 5){T.base = T.charge;T.reserve = '';T.phase = 'recup';T.recupFin = Date.now() + 120000;rendreTest();return}
+  if(ok && T.series.length < 5){T.base = T.charge;T.reserve = '';T.phase = 'recup';T.recupFin = Date.now() + 120000;T.repSif = 0;rendreTest();return}
   T.phase = 'fin';rendreTest();
 }
-setInterval(() => {const c = $('tChrono');if(!c || !T)return;const r = Math.max(0, Math.round((T.recupFin - Date.now()) / 1000));c.textContent = Math.floor(r / 60) + ':' + String(r % 60).padStart(2, '0');if(r === 0)c.style.color = 'var(--ok)'}, 500);
+setInterval(() => {const c = $('tChrono');if(!c || !T)return;const r = Math.max(0, Math.round((T.recupFin - Date.now()) / 1000));c.textContent = Math.floor(r / 60) + ':' + String(r % 60).padStart(2, '0');if(r === 0){c.style.color = 'var(--ok)';if(!T.repSif){T.repSif = 1;try{window.EPSSifflet && EPSSifflet.reprise()}catch(e){}}}}, 500);
 function validerTest(){
   const e = B.e[T.el], best = meilleure(T.series);if(!best)return;
   if(rmVerrou(e))return toast('Charges max bloquées pendant l\'évaluation (S9).');

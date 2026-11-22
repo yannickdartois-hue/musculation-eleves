@@ -19,6 +19,8 @@ function son(f, d, v){const m = mode();if(m === 'silent')return;
   if(m === 'vibrate'){try{navigator.vibrate && navigator.vibrate(Math.round(Math.min(d, .5) * 400) + 40)}catch(e){}return}
   try{ac = ac || new (window.AudioContext || window.webkitAudioContext)();if(ac.state === 'suspended')ac.resume();
     const o = ac.createOscillator(), g = ac.createGain(), t = ac.currentTime;o.frequency.value = f;g.gain.setValueAtTime(v || .3, t);g.gain.exponentialRampToValueAtTime(.001, t + d);o.connect(g);g.connect(ac.destination);o.start(t);o.stop(t + d)}catch(e){}}
+/* v6.3 : coup de sifflet + vibration (eps-sifflet.js) ; false = sons habituels */
+const SIF = k => {try{return !!(root.EPSSifflet && root.EPSSifflet[k]())}catch(e){return false}};
 const bip = () => son(880, .12), go = () => son(1320, .45, .4), fin = () => [[523, 0], [659, 120], [784, 240], [1047, 380]].forEach(([f, d]) => setTimeout(() => son(f, d === 380 ? .4 : .1, .45), d));
 async function eveil(on){try{if(on && navigator.wakeLock)lock = await navigator.wakeLock.request('screen');else if(lock){lock.release();lock = null}}catch(e){}}
 const mmss = s => {s = Math.max(0, Math.round(s));return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0')};
@@ -36,12 +38,13 @@ function ouvrir(o){
   const div = document.createElement('div');div.className = 'chm';div.setAttribute('role', 'dialog');div.setAttribute('aria-modal', 'true');
   document.body.appendChild(div);document.documentElement.classList.add('chrono-ouvert');eveil(true);
   const ecoule = () => (Date.now() - t0) / 1000;
-  function changer(p){phase = p;t0 = Date.now();dernier = -1;rendu()}
+  let miFait = false;
+  function changer(p){phase = p;t0 = Date.now();dernier = -1;miFait = false;rendu()}
   function boucle(){
     const e = ecoule(), s = Math.ceil(e);
-    if(phase === 'prep'){const r = PREP - e;if(r <= 0){go();return changer('serie')}if(Math.ceil(r) !== dernier){dernier = Math.ceil(r);bip()}}
-    else if(phase === 'serie' && o.temps){const r = nb(o.reps) - e;if(r <= 0){go();return finSerie()}if(r <= 3 && Math.ceil(r) !== dernier){dernier = Math.ceil(r);bip()}}
-    else if(phase === 'repos'){const r = recup - e;if(r <= 0){go();serie++;return changer('serie')}if(r <= 3 && Math.ceil(r) !== dernier){dernier = Math.ceil(r);bip()}else if(Math.round(r) === 10 && dernier !== 10){dernier = 10;son(660, .15)}}
+    if(phase === 'prep'){const r = PREP - e;if(r <= 0){if(!SIF('depart'))go();return changer('serie')}if(Math.ceil(r) !== dernier){dernier = Math.ceil(r);bip()}}
+    else if(phase === 'serie' && o.temps){const r = nb(o.reps) - e;if(nb(o.reps) >= 60 && !miFait && r <= nb(o.reps) / 2){miFait = true;SIF('mi')}if(r <= 0){const s = SIF('fin');if(!s)go();return finSerie(s)}if(r <= 3 && Math.ceil(r) !== dernier){dernier = Math.ceil(r);bip()}}
+    else if(phase === 'repos'){const r = recup - e;if(r <= 0){if(!SIF('reprise'))go();serie++;return changer('serie')}if(r <= 3 && Math.ceil(r) !== dernier){dernier = Math.ceil(r);bip()}else if(Math.round(r) === 10 && dernier !== 10){dernier = 10;son(660, .15)}}
     const el = div.querySelector('.chm-temps');if(el)el.textContent = affTemps();
     const ba = div.querySelector('.chm-barre i');if(ba)ba.style.width = progr() + '%';
   }
@@ -50,7 +53,7 @@ function ouvrir(o){
     if(phase === 'serie')return o.temps ? mmss(nb(o.reps) - e) : mmss(e);
     if(phase === 'repos')return mmss(recup - e);return ''}
   function progr(){const e = ecoule();return phase === 'repos' ? Math.min(100, e / recup * 100) : phase === 'serie' && o.temps ? Math.min(100, e / nb(o.reps) * 100) : 0}
-  function finSerie(){if(serie >= N){fin();changer('fini')}else changer('repos')}
+  function finSerie(dejaSiffle){if(serie >= N){if(!dejaSiffle && !SIF('fin'))fin();changer('fini')}else changer('repos')}
   function fermer(){clearInterval(tick);eveil(false);document.removeEventListener('visibilitychange', vis);div.remove();document.documentElement.classList.remove('chrono-ouvert')}
   function vis(){if(document.visibilityState === 'visible'){eveil(true);boucle()}}
   function coach(){return `<details class="chm-coach"${voirCoach ? ' open' : ''}><summary>👀 Coach${o.partenaire ? ' (' + esc(o.partenaire) + ')' : ''} : ce que tu vérifies</summary>
@@ -59,7 +62,7 @@ function ouvrir(o){
     ${o.signes && o.signes.length ? `<p class="small"><b>Signes de fatigue à repérer :</b> ${o.signes.map(esc).join(' · ')}</p>` : ''}</details>`}
   function rendu(){
     const tete = `<div class="chm-tete"><div><b>${esc(o.nom)}</b><br><span>${esc(o.mobNom || '')}${o.chargeTxt ? ' · ' + esc(o.chargeTxt) : ''}</span></div>
-      <div class="chm-bts"><button type="button" class="chm-mini" data-c="son">${libMode()}</button><button type="button" class="chm-mini" data-c="quitter">✕</button></div></div>`;
+      <div class="chm-bts">${root.EPSSifflet ? root.EPSSifflet.bouton() : ''}<button type="button" class="chm-mini" data-c="son">${libMode()}</button><button type="button" class="chm-mini" data-c="quitter">✕</button></div></div>`;
     const pastilles = `<div class="chm-series">${Array.from({length:N}, (_, i) => `<span class="${i + 1 < serie || phase === 'fini' || (phase === 'repos' && i + 1 === serie) ? 'ok' : i + 1 === serie || (phase === 'repos' && i === serie) ? 'ici' : ''}">${i + 1}</span>`).join('')}</div>`;
     let corps = '';
     if(phase === 'prep')corps = `<p class="chm-etat">Prêt ? Série ${serie}</p><div class="chm-temps chm-gros">${affTemps()}</div>${o.approche && serie === 1 ? `<p class="chm-consigne">🔸 Série d'approche avant : ${esc(o.approche)}</p>` : ''}`;
@@ -87,7 +90,7 @@ function ouvrir(o){
     if(c === 'son'){modeSuivant();b.textContent = libMode();if(mode() !== 'silent')bip();return}
     if(c === 'quitter'){if(phase !== 'fini' && phase !== 'prep' && !confirm('Quitter le chrono ?'))return;fermer();return}
     if(c === 'finserie'){finSerie();return}
-    if(c === 'pret'){serie++;changer('serie');go();return}
+    if(c === 'pret'){serie++;changer('serie');if(!SIF('depart'))go();return}
     if(c === 'moins'){recup = Math.max(15, recup - 15);boucle();return}
     if(c === 'plus'){recup += 15;boucle();return}
     if(c === 'fait'){fermer();o.onFait && o.onFait();return}
@@ -115,6 +118,7 @@ const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp
 const mmss = s => {s = Math.max(0, Math.round(s));return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0')};
 const nb = v => Array.isArray(v) ? v[1] : (+v || 0);
 let ac = null, lock = null;
+const SIF = k => {try{return !!(root.EPSSifflet && root.EPSSifflet[k]())}catch(e){return false}};
 function son(f, d){let m = 'sound';try{m = localStorage.getItem('eps_sound_mode') || 'sound'}catch(e){}if(m === 'silent')return;
   if(m === 'vibrate'){try{navigator.vibrate && navigator.vibrate(200)}catch(e){}return}
   try{ac = ac || new (window.AudioContext || window.webkitAudioContext)();if(ac.state === 'suspended')ac.resume();const o = ac.createOscillator(), g = ac.createGain(), t = ac.currentTime;o.frequency.value = f;g.gain.setValueAtTime(.35, t);g.gain.exponentialRampToValueAtTime(.001, t + d);o.connect(g);g.connect(ac.destination);o.start(t);o.stop(t + d)}catch(e){}}
@@ -151,7 +155,7 @@ function binome(P, opts){
           ${tr > 0 ? `<p class="chb-rec">Temps pour changer les disques : <b>${dyn(mmss(tr))}</b></p>` : `<p class="chb-rec">${s.faites || i ? 'Barre prête ? Partenaire en place pour parer ?' : 'Barre chargée ? Partenaire en place ?'}</p>`}
           ${bloque ? `<p class="chb-att">⏸ Récupération obligatoire${p.bloque ? ' en ' + esc(p.mobNom || '') : ''} : encore ${dyn(mmss(r))}</p>` : attentionRec ? `<p class="chb-att">⚠️ Récupération conseillée : encore ${dyn(mmss(r))}</p>` : ''}
           <div class="chb-tr"><span>Transition</span><button type="button" data-b="tr" data-v="-10" aria-label="moins 10 secondes">−10 s</button><b>${TR} s</b><button type="button" data-b="tr" data-v="10" aria-label="plus 10 secondes">+10 s</button></div>
-          <button type="button" class="chb-bt" data-b="pret"${bloque ? ' disabled' : ''}>${bloque ? 'Attends la fin de ta récupération' : '✋ JE SUIS PRÊT'}</button></section>`;
+          ${root.EPSSifflet ? root.EPSSifflet.bouton() : ''}<button type="button" class="chb-bt" data-b="pret"${bloque ? ' disabled' : ''}>${bloque ? 'Attends la fin de ta récupération' : '✋ JE SUIS PRÊT'}</button></section>`;
       }
       /* 2. décompte 3 s */
       if(now < s.depart)return `<section class="chb-m prep"><div class="chb-l"><b>${esc(p.prenom)}</b> · ⏳ ATTENTION…</div><div class="chb-t">${dyn(String(Math.max(1, Math.ceil((s.depart - now) / 1000))))}</div>${pills(i)}<p>${esc(p.nom)}${p.chargeTxt ? ' · ' + esc(p.chargeTxt) : ''}</p></section>`;
@@ -180,7 +184,7 @@ function binome(P, opts){
     els.forEach((el, n) => {const t = (v[n] || '').replace(/&amp;/g, '&');if(el.textContent !== t)el.textContent = t});
   }
   function bascule(){const i = qui;st[i].faites++;st[i].repos = Date.now();st[i].bip = false;st[i].depart = null;son(1320, .35);
-    const o = 1 - i;if(!fini(o))qui = o;st[qui].trans = Date.now();st[qui].finTr = false;st[qui].depart = null;if(fini(0) && fini(1))son(880, .6);rendu()}
+    const o = 1 - i;if(!fini(o))qui = o;st[qui].trans = Date.now();st[qui].finTr = false;st[qui].depart = null;if(fini(0) && fini(1) && !SIF('fin'))son(880, .6);rendu()}
   div.addEventListener('click', ev => {const b = ev.target.closest('[data-b]');if(!b || b.disabled)return;const a = b.dataset.b;
     if(a === 'fin'){bascule();return}
     if(a === 'pret'){st[qui].depart = Date.now() + 3000;son(880, .12);rendu();return}
@@ -191,7 +195,7 @@ function binome(P, opts){
   });
   let dernier = -1;
   function boucle(){const now = Date.now(), s = st[qui];
-    if(s.depart != null && !fini(qui)){if(now < s.depart){const r = Math.ceil((s.depart - now) / 1000);if(r !== dernier){dernier = r;son(880, .12)}}else if(dernier !== 0){dernier = 0;son(1320, .4)}}
+    if(s.depart != null && !fini(qui)){if(now < s.depart){const r = Math.ceil((s.depart - now) / 1000);if(r !== dernier){dernier = r;son(880, .12)}}else if(dernier !== 0){dernier = 0;if(!SIF('depart'))son(1320, .4)}}
     else dernier = -1;
     if(s.depart == null && s.trans != null && !s.finTr && TR > 0 && now - s.trans >= TR * 1000){s.finTr = true;son(660, .2)}
     P.forEach((p, i) => {if(st[i].repos != null && !st[i].bip && reposRestant(i) <= 0){st[i].bip = true;son(660, .2)}});
