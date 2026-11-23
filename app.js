@@ -183,7 +183,7 @@ function panneauMobiles(){
 /* ================== Charges : calculs ================== */
 function cmDe(e, at){const r = e.rm[at];return r && r.cm ? r.cm : null}
 /* v2.2 : charge max avec historique (rien n'est perdu), mise à jour bloquée pendant l'évaluation (S8-S9) */
-function majRM(e, at, rec){const old = e.rm[at];rec.hist = ((old && old.hist) || []).concat(old ? [{cm:old.cm, date:old.date, mode:old.mode}] : []);e.rm[at] = rec}
+function majRM(e, at, rec){const old = e.rm[at];rec.hist = ((old && old.hist) || []).concat(old ? [{cm:old.cm, date:old.date, mode:old.mode, S:old.S || ''}] : []);e.rm[at] = rec}   // v6.4 : la séance est gardée dans l'historique
 const rmVerrou = e => !!(e.seances.S9 && Object.keys(e.seances.S9).length);   // v5.0 : évaluation en S9
 const MODE_RM = {test:'test', direct:'saisie directe', seance:'mise à jour en séance'};
 /* estimation d'après la série réalisée + les répétitions en réserve (Brzycki prolongé à 15 répétitions au total, prudent : borne basse de la réserve).
@@ -756,6 +756,45 @@ async function chaineQR(o){
   return 'MUS0:' + b64(json);
 }
 function svgQR(txt){const q = qrcode(0, 'M');q.addData(txt);q.make();return q.createSvgTag({cellSize:6, margin:2, scalable:true})}
+/* ---------- v6.4 : QR de séance pour le professeur (un par binôme et par séance) ----------
+   Contient seulement la séance choisie, pour chaque élève (avec son nom), + ses charges de référence
+   en abrégé, son projet / choix / répartition AFL dès la S7. Si c'est trop long : plusieurs QR à la suite. */
+const RM_COURT = r => {const h = (r.hist || []).map(x => [x.cm, x.S || '', x.date || '', x.mode || '']);return [r.cm, r.dix || 0, r.mode || '', r.S || '', r.date || '', h]};
+function donneesSeance(e, S){
+  const s = JSON.parse(JSON.stringify(e.seances[S] || {}));delete s.seq;
+  const o = {e:e.nom, D:s, rm:{}};
+  Object.entries(e.rm || {}).forEach(([at, r]) => {if(r && r.cm)o.rm[at] = RM_COURT(r)});
+  if(absent(e, S))o.ab = 1;
+  if(+S.slice(1) >= SEANCE_PROJET){if(e.projet)o.pr = e.projet;if(e.choix)o.ch = e.choix;const aj = (e.ajust || []).filter(a => a.S === S);if(aj.length)o.aj = aj}
+  if(e.afl && (e.afl.rep || e.afl.role))o.af = e.afl;
+  if(e.tirage && S === 'S9')o.ti = e.tirage.l;
+  return o;
+}
+const QR_MAX = 900;
+async function qrsSeance(S){
+  const ts = Math.round(Date.now() / 1000), o = {a:'MUS', v:1, t:'G', c:B.classe || '', s:S, d:jour(), ts, id:B.id.slice(0, 8) + S + ts.toString(36), b:B.id, R:B.e.map(e => donneesSeance(e, S))};
+  if(B.listes && B.listes[S])o.l = B.listes[S];
+  const txt = await chaineQR(o);if(txt.length <= QR_MAX)return [txt];
+  const n = Math.ceil(txt.length / QR_MAX), k8 = o.id.slice(-6), L = [];
+  for(let i = 0;i < n;i++)L.push(`MUSP:${k8}:${i + 1}/${n}:` + txt.slice(i * QR_MAX, (i + 1) * QR_MAX));
+  return L;
+}
+let QRS = null;
+async function afficherQRSeance(S){
+  const vide = B.e.every(e => !Object.keys(e.seances[S] || {}).length && !absent(e, S));
+  if(vide && !confirm(`Rien n'est rempli en ${S}. Montrer quand même le QR ?`))return;
+  QRS = {S, L:await qrsSeance(S), i:0};
+  if(!DEMO){B.envois = (B.envois || []).concat(S + ' QR ' + new Date().toLocaleString('fr-FR'));sauver()}
+  dessinerQRSeance();
+}
+function dessinerQRSeance(){
+  const q = QRS;if(!q)return;const n = q.L.length;
+  fenetre(`<h3>📲 Séance ${q.S} pour le prof</h3><p class="small">${B.e.map(e => esc(prenom(e.nom))).join(' & ')} · montre ce QR à la tablette du professeur.</p>
+   ${n > 1 ? `<p class="retour non" style="text-align:center">QR <b>${q.i + 1} sur ${n}</b> : le prof les scanne tous, dans n'importe quel ordre.</p>` : ''}
+   <div class="qr">${svgQR(q.L[q.i])}</div>
+   ${n > 1 ? `<div class="rangee" style="justify-content:center"><button type="button" class="bt" data-act="qrPrec"${q.i ? '' : ' disabled'}>◀ Précédent</button><button type="button" class="bt act" data-act="qrSuiv"${q.i < n - 1 ? '' : ' disabled'}>Suivant ▶</button></div>` : ''}
+   <button type="button" class="bt pleine" data-act="fermerFen" style="margin-top:8px">Fermer</button>`);
+}
 async function afficherQRMots(){
   const m = motsSeance(SEANCE), o = {a:'MUS', t:'mots', b:B.id.slice(0, 8), s:SEANCE, debut:m.debut, fin:m.fin};
   if((SEANCE === 'S2' || SEANCE === 'S3') && B.equipe){const d = defiBinome();o.defi = {e:B.equipe, kg:d.kg, q:d.q}}
@@ -1031,11 +1070,15 @@ function vueEnvoyer(){
   const der = (B.envois || []).slice(-1)[0], n = +SEANCE.slice(1);
   const manque = n >= SEANCE_MOBILE[0] ? B.e.filter(x => !absent(x) && x.seances[SEANCE] && Object.keys(x.seances[SEANCE]).length && !bilanComplet(x, SEANCE)) : [];
   return `<h2>Envoyer le carnet</h2>${manque.length ? `<p class="retour non">Il manque le bilan de ${manque.map(x => esc(prenom(x.nom))).join(' et de ')} en ${SEANCE} (30 secondes) : onglet Séance, dernière séquence.</p>` : ''}
-   <section class="carte act"><h3>📤 Fichier pour le Nuage</h3><p>En fin de séance : télécharge le fichier du carnet, puis dépose-le dans le dossier Nuage donné par le professeur.</p>
+   <section class="carte act"><h3>📲 QR de la séance pour le prof</h3><p>En fin de séance, montrez ce QR à la tablette du professeur : il range la séance de chacun de vous dans sa fiche.</p>
+    <div class="puces">${SEANCES_IDS.map(S => `<button type="button" class="${S === SEANCE ? 'ici' : ''}${B.e.some(x => Object.keys(x.seances[S] || {}).length) ? ' fait' : ''}" data-qrseance="${S}">${S}</button>`).join('')}</div>
+    <button type="button" class="bt act pleine" data-qrseance="${SEANCE}">📲 Montrer le QR de la ${SEANCE}</button>
+    <p class="small muted">Une autre séance à rattraper ? Touche son numéro.</p></section>
+   <section class="carte"><h3>📤 Secours : fichier pour le Nuage</h3><p>En fin de séance : télécharge le fichier du carnet, puis dépose-le dans le dossier Nuage donné par le professeur.</p>
     <button type="button" class="bt act pleine" data-act="exporter">Télécharger le carnet</button>${CLASSES[B.classe] && CLASSES[B.classe].u ? `<a class="bt pleine" style="margin-top:8px" href="${esc(CLASSES[B.classe].u)}" target="_blank" rel="noopener">☁️ Ouvrir le dépôt Nuage de la classe</a>` : ''}${navigator.share ? `<button type="button" class="bt pleine" style="margin-top:8px" data-act="partager">Partager le fichier</button>` : ''}
     <p class="small muted">${der ? 'Dernier envoi : ' + esc(der) : 'Pas encore envoyé.'}</p></section>
    <section class="carte"><h3>Mots et défi</h3><p class="small">S1, S2 et S3 : le QR pour le nuage de mots de la classe et le défi.</p><div class="rangee">${['S1', 'S2', 'S3'].map(S => `<button type="button" class="bt mini" data-qr-s="${S}">QR ${S}</button>`).join('')}</div></section>
-   <section class="carte"><h3>Ce téléphone</h3><p class="small">Les noms restent sur ce téléphone et dans le fichier envoyé au professeur. Rien n'est envoyé ailleurs.</p><div class="rangee"><button type="button" class="bt mini" data-act="fermerCarnet">Fermer le carnet</button><button type="button" class="bt mini danger" data-act="supprimer">Supprimer ce carnet</button></div></section>`;
+   <section class="carte"><h3>Ce téléphone</h3><p class="small">Les noms restent sur ce téléphone, dans le QR lu par la tablette du professeur et dans le fichier envoyé au professeur. Rien n'est envoyé ailleurs.</p><div class="rangee"><button type="button" class="bt mini" data-act="fermerCarnet">Fermer le carnet</button><button type="button" class="bt mini danger" data-act="supprimer">Supprimer ce carnet</button></div></section>`;
 }
 function fichierCarnet(){
   const o = JSON.parse(JSON.stringify(B));delete o.code;o.exporte = new Date().toISOString();o.version = MUSCU_VERSION;
@@ -1195,6 +1238,7 @@ document.addEventListener('click', async ev => {
     x[k] = Math.max(lo, Math.min(hi, x[k] + step * +d.d));sauver();rendre();return}
   if(d.pniv != null){EL().projet.exos[+d.pniv].niv = +d.k;sauver();rendre();return}
   if(d.qrS){SEANCE = d.qrS;afficherQRMots();return}
+  if(d.qrseance){afficherQRSeance(d.qrseance);return}
   switch(d.act){
     case 'creer': creer();break;
     case 'scanClasse': scanner();break;
@@ -1237,6 +1281,8 @@ document.addEventListener('click', async ev => {
       fenetre(`<h3>Nouveau mobile</h3><div class="mob-choix">${ord.map(k => `<button type="button" style="--mc:${MOBILES[k].coul}" data-chg-mob="${k}"><img src="${MOB_IMG[k]}" alt=""><span>${MOBILES[k].nom}</span></button>`).join('')}</div><button type="button" class="bt" data-act="fermerFen">Annuler</button>`)}break;
     case 'exporter': exporter();break;
     case 'importer': choisirImport();break;
+    case 'qrPrec': if(QRS && QRS.i > 0){QRS.i--;dessinerQRSeance()}break;
+    case 'qrSuiv': if(QRS && QRS.i < QRS.L.length - 1){QRS.i++;dessinerQRSeance()}break;
     case 'valImport': validerImport();break;
     case 'partager': partager();break;
     case 'fermerCarnet': B = null;DEMO = false;rendre();break;
