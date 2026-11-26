@@ -166,15 +166,16 @@ async function recevoirClasse(o){
   return 'Classe ' + o.c + ' : ' + (o.l || []).length + ' élèves' + (o.cj && o.cj.d === jour() ? ' · séance ' + o.cj.s + ' ouverte' : '');
 }
 let FLUX = null;
-function scanner(){
+function scanner(traiter, titre){   // traiter(texte) → message ; par défaut : QR de la classe
+  traiter = traiter || (t => decoderQR(t).then(recevoirClasse));
   if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia)return toast('Caméra indisponible sur ce téléphone.');
-  fenetre(`<h3>📷 QR de la classe</h3><video playsinline muted style="width:100%;border-radius:12px;background:#000"></video><p class="small" id="scMsg">Vise le QR affiché par le professeur.</p><button type="button" class="bt pleine" data-act="fermerScan">Fermer</button>`);
+  fenetre(`<h3>${titre || '📷 QR de la classe'}</h3><video playsinline muted style="width:100%;border-radius:12px;background:#000"></video><p class="small" id="scMsg">Vise le QR affiché par le professeur.</p><button type="button" class="bt pleine" data-act="fermerScan">Fermer</button>`);
   const v = document.querySelector('.fen video'), c = document.createElement('canvas'), x = c.getContext('2d', {willReadFrequently:true});let fini = false;
   navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}}).then(st => {FLUX = st;v.srcObject = st;v.play();boucle()}).catch(() => {$('scMsg').textContent = 'Autorise la caméra pour cette page, puis réessaie.'});
   function boucle(){
     if(!FLUX || !document.querySelector('.fen video'))return;
     if(v.readyState >= 2){c.width = v.videoWidth;c.height = v.videoHeight;x.drawImage(v, 0, 0);const r = jsQR(x.getImageData(0, 0, c.width, c.height).data, c.width, c.height);
-      if(r && r.data && !fini){fini = true;decoderQR(r.data).then(recevoirClasse).then(t => {arreterScan();fermerFen();toast('✓ ' + t);rendre()}).catch(e => {$('scMsg').textContent = e.message;setTimeout(() => fini = false, 1500)})}}
+      if(r && r.data && !fini){fini = true;Promise.resolve().then(() => traiter(r.data)).then(t => {arreterScan();fermerFen();toast('✓ ' + t);rendre()}).catch(e => {$('scMsg').textContent = e.message;setTimeout(() => fini = false, 1500)})}}
     requestAnimationFrame(boucle);
   }
 }
@@ -477,21 +478,29 @@ function reglesListe(S){
 }
 function carteReglesListe(){const r = reglesListe(SEANCE);
   return r.err.length ? `<section class="carte alerte-c"><h3>⚠️ À corriger avant de commencer</h3><ul class="ats small">${r.err.map(t => `<li>${esc(t)}</li>`).join('')}</ul><button type="button" class="bt act" data-act="changerListe">Changer les exercices</button></section>` : r.ok.length ? `<p class="retour ok">${r.ok.map(esc).join(' · ')}</p>` : ''}
-/* S6 : niveau de puissance (découverte pour tous, confirmé débloqué par le professeur avec le code du cours) */
+/* S6 : niveau de puissance (découverte pour tous, confirmé débloqué par le professeur avec son QR) */
 function carteNiveauPuiss(){
   const e = EL(), c = MOBILES.puiss.couples;
   return `<section class="carte"><h3>⚡ Mon niveau en Puissance · ${esc(prenom(e.nom))}</h3><div class="chips"><span class="chip-niv${e.puissOk ? '' : ' ici'}">Découverte · ${coupleTxt(c[0])}</span><span class="chip-niv${e.puissOk ? ' ici' : ''}">${e.puissOk ? '✓' : '🔒'} Confirmé · ${coupleTxt(c[1])}, puis ${coupleTxt(c[2])}</span></div>
-   <p class="small">${e.puissOk ? 'Niveau confirmé validé par ton professeur.' : 'Tout le monde commence en découverte : trajet parfait d\'abord, puis vitesse. Le niveau confirmé se débloque sur avis du professeur.'}</p>${e.puissOk ? '' : '<button type="button" class="bt mini" data-act="debloquerPuiss">Le professeur débloque (code du cours)</button>'}</section>`;
+   <p class="small">${e.puissOk ? 'Niveau confirmé validé par ton professeur.' : 'Tout le monde commence en découverte : trajet parfait d\'abord, puis vitesse. Le niveau confirmé se débloque sur avis du professeur.'}</p>${e.puissOk ? '' : '<button type="button" class="bt mini" data-act="debloquerPuiss">Le professeur débloque (QR)</button>'}</section>`;
 }
-async function verifierCodeProf(v){
-  if(DEMO)return v === '0000';
-  const c = B.classe || '';let cle = '';try{cle = ((JSON.parse(localStorage.getItem('eps-code:mue') || '{}').cles) || {})[c] || ''}catch(e){}
-  if(!cle || !window.EPSCode)return /^\d{4}$/.test(v);
-  try{return v === await EPSCode.code(cle, c, EPSCode.jour(), SEANCE)}catch(e){return false}
+/* Chantier 9 : plus de code tapé. Le professeur montre le QR « Niveau confirmé » (classe + jour, signé avec la clé de la classe). */
+async function validerPuiss(t){
+  const S = ' Demande au professeur d\'afficher le QR « Niveau confirmé » du jour.';
+  let o;try{o = await decoderQR(t)}catch(e){throw new Error('Ce QR n\'est pas un QR de musculation.' + S)}
+  if(o.t !== 'P')throw new Error('Ce n\'est pas le QR « Niveau confirmé ».' + S);
+  const c = B.classe || '';
+  if(o.c !== c)throw new Error('Ce QR est celui de la classe ' + o.c + ', pas de la tienne (' + c + ').' + S);
+  if(o.d !== EPSCode.jour())throw new Error('Ce QR n\'est pas celui d\'aujourd\'hui. Vérifie aussi la date du téléphone.' + S);
+  const cle = (EPSCode.cleDe && EPSCode.cleDe(c)) || '';
+  if(!cle)throw new Error('Scanne d\'abord le QR de la classe, puis ce QR.');
+  let ok = false;try{ok = String(o.k) === await EPSCode.code(cle, c, o.d, 'PUISS')}catch(e){}
+  if(!ok)throw new Error('Ce QR ne permet pas de débloquer le niveau (abîmé ou modifié).' + S);
+  EL().puissOk = jour();sauver();rendre();return '⚡ Niveau confirmé débloqué pour ' + prenom(EL().nom);
 }
 function debloquerPuiss(){
-  fenetre(`<h3>⚡ Niveau confirmé</h3><p class="small">Réservé au professeur : il tape le code du cours du jour.${DEMO ? ' (démo : 0000)' : ''}</p><input type="password" inputmode="numeric" maxlength="4" id="cpCode" class="code" autocomplete="off"><p class="small" id="cpErr" style="color:var(--alerte);min-height:1.3em"></p>
-   <div class="rangee"><button type="button" class="bt act" data-act="valPuiss">Valider</button><button type="button" class="bt" data-act="fermerFen">Annuler</button></div>`);
+  fenetre(`<h3>⚡ Niveau confirmé · ${esc(prenom(EL().nom))}</h3><p>Le professeur affiche le <b>QR « Niveau confirmé »</b> : scanne-le pour débloquer le niveau.</p>
+   <div class="rangee"><button type="button" class="bt act" data-act="${DEMO ? 'valPuiss' : 'scanPuiss'}">📷 Scanner le QR du professeur</button><button type="button" class="bt" data-act="fermerFen">Annuler</button></div>`);
 }
 /* S7-S8 : 3 exercices du projet par séance */
 function jourDe(e, S){
@@ -932,7 +941,7 @@ function carteComparer(){
    ${Object.keys(MOBILE_DU_JOUR).map(S => {const m = MOBILE_DU_JOUR[S], st = statsMobile(e, S);return `<tr><td><b style="color:${MOBILES[m].coul}">${MOBILES[m].nom}</b></td><td>${st ? st.moy : '—'}</td><td>${st ? st.ok + '/' + st.n : '—'}</td><td>${st ? esc(st.mots.join(', ')) : ''}</td></tr>`}).join('')}</table>
    ${e.situe && suggestion(e.situe) ? `<p class="small muted">En S1, « Je me situe » suggérait : ${MOBILES[suggestion(e.situe)].nom}.</p>` : ''}
    <h4>Mon mobile pour le projet</h4>${e.projet && e.projet.exos && e.projet.exos.length ? `<p class="retour ok">Mobile définitif : <b>${MOBILES[c.mob || e.projet.mob].nom}</b>. Il ne change plus.</p>` : `<div class="mob-choix">${MOBILES_ORDRE.map(m => {const bloque = m === 'puiss' && !e.puissOk;return `<button type="button" class="${c.mob === m ? 'ici' : ''}${bloque ? ' bloque' : ''}" style="--mc:${MOBILES[m].coul}" data-choix="${m}"><img src="${MOB_IMG[m]}" alt=""><span>${c.mob === m ? '✓ ' : bloque ? '🔒 ' : ''}${MOBILES[m].nom}</span></button>`}).join('')}</div>
-   ${!e.puissOk ? `<p class="small muted">🔒 Puissance : seulement si ton professeur a validé le niveau confirmé (en S6, ou maintenant avec le code du cours).</p><button type="button" class="bt mini" data-act="debloquerPuiss">Débloquer (code du prof)</button>` : ''}<p class="small"><b>Attention :</b> ce choix est définitif dès que ton projet est construit.</p>`}
+   ${!e.puissOk ? `<p class="small muted">🔒 Puissance : seulement si ton professeur a validé le niveau confirmé (en S6, ou maintenant avec son QR « Niveau confirmé »).</p><button type="button" class="bt mini" data-act="debloquerPuiss">Débloquer (code du prof)</button>` : ''}<p class="small"><b>Attention :</b> ce choix est définitif dès que ton projet est construit.</p>`}
    <label class="ch" for="choixPq">Pourquoi ? Quelle sensation te le dit ?</label><textarea id="choixPq" data-texte="choix">${esc(c.pourquoi || '')}</textarea></section>`;
 }
 function carteEchelle(){
@@ -1264,12 +1273,13 @@ document.addEventListener('click', async ev => {
   switch(d.act){
     case 'creer': creer();break;
     case 'scanClasse': scanner();break;
+    case 'scanPuiss': scanner(validerPuiss, '⚡ QR Niveau confirmé');break;
     case 'fermerScan': fermerFen();break;
     case 'demo': DEMO = true;B = binomeDemo();P = 0;ONGLET = 'seance';SEANCE = 'S5';rendre();window.scrollTo(0, 0);break;
     case 'quitterDemo': DEMO = false;B = null;rendre();break;
     case 'mobiles': panneauMobiles();break;
     case 'debloquerPuiss': debloquerPuiss();break;
-    case 'valPuiss': {const v = ($('cpCode') || {}).value || '';if(await verifierCodeProf(v)){EL().puissOk = jour();sauver();fermerFen();rendre();toast('⚡ Niveau confirmé débloqué.')}else $('cpErr').textContent = 'Code incorrect.';break}
+    case 'valPuiss': {if(!DEMO)break;EL().puissOk = jour();fermerFen();rendre();toast('⚡ Démo : niveau confirmé débloqué.');break}
     case 'valTirage': {const e = EL(), l = e.tirageMan || [];if(l.length !== 3)return toast('Choisis exactement 3 exercices.');e.tirage = {l:l.slice(), src:'manuel', date:jour()};sauver();rendre();break}
     case 'refaireTirage': if(confirm('Effacer le tirage enregistré ?')){delete EL().tirage;EL().tirageMan = [];sauver();rendre()}break;
     case 'chronoBinome': choixBinome();break;
@@ -1338,8 +1348,8 @@ document.addEventListener('keydown', ev => {if(ev.key === 'Enter' && ev.target.i
 $('btMob').onclick = panneauMobiles;
 window.addEventListener('eps-avant-maj', () => sauver());
 
-/* ---------- Code du cours (eps-code.js) : la saisie d'une séance n'est ouverte qu'en cours ---------- */
-if(window.EPSCode)EPSCode.eleve({app:'mue', classe:() => B && !DEMO ? B.classe || '' : '', seance:() => SEANCE, seances:() => SEANCES_IDS,
+/* ---------- Séance du jour (eps-code.js v2) : la saisie n'est ouverte qu'en cours, avec le QR du jour du professeur ---------- */
+if(window.EPSCode)EPSCode.eleve({app:'mue', qrApp:'MUS', scanner:v => scanner(async t => {let o;try{o = await decoderQR(t)}catch(e){throw new Error('Ce QR n’est pas un QR de cette appli. Demande le QR du jour à ton professeur.')}await v(o);return recevoirClasse(o)}, '📷 QR du jour'), classe:() => B && !DEMO ? B.classe || '' : '', seance:() => SEANCE, seances:() => SEANCES_IDS,
   nom:x => x + ' · ' + (seanceById(x) || {titre:''}).titre, ouvrir:x => {SEANCE = x;ONGLET = 'seance';rendre()}, zone:'#main',
   actif:() => !!B && ONGLET === 'seance', libreSel:'.seq-tete,.titre-fiche,.protocole summary,.puces button,.se-bt,.qui button,[data-fiche],[data-poster],[data-ech],[data-libre],details summary,[data-act="mobiles"]', demo:() => DEMO, bandeau:true});
 
