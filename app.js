@@ -78,7 +78,7 @@ function rendre(){
   const corps = {seance:vueSeance, charges:vueCharges, projet:vueProjet, carnet:vueCarnet, fiches:vueFiches, envoyer:vueEnvoyer}[ONGLET]();
   main.style.minHeight = main.offsetHeight + 'px';
   main.innerHTML = demo + `<p class="onglet-aide">${AIDE_ONGLET[ONGLET] || ''}</p>` + (ONGLET === 'envoyer' || ONGLET === 'fiches' ? '' : qui) + corps;
-  const bs = $('btnSeance');if(bs)EPSSeances.bouton(bs, {cle:'musculation-eleves:seance', rang:SEANCES_IDS.indexOf(SEANCE), total:SEANCES_IDS.length, texte:'<span aria-hidden="true">▾</span>'});
+  const bs = $('btnSeance');if(bs)EPSSeances.bouton(bs, {cle:'musculation-eleves:seance', rang:SEANCES_IDS.indexOf(SEANCE), total:SEANCES_IDS.length, texte:SEANCE + ' <span aria-hidden="true">▾</span>'});
   window.scrollTo(0, y);
   if(anc){try{const n = main.querySelector(anc.sel);if(n){const d = n.getBoundingClientRect().top - anc.top;if(Math.abs(d) > 1)window.scrollBy(0, d)}}catch(e){}}
   main.style.minHeight = '';
