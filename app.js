@@ -1152,7 +1152,7 @@ function binomeDemo(){
   e1.choix = {mob:'volume', pourquoi:"C'est en Volume que j'ai senti mes muscles gonfler, et c'est ce que je cherche."};
   e1.echelle = {3:'léger', 5:'chaud', 6:'ça picote', 7:'ça brûle', 8:'ça gonfle', 10:'je bloque'};
   e1.projet = {mob:'volume', exos:[{at:'dch', series:4, reps:10, pct:70}, {at:'rowh', series:4, reps:10, pct:70}, {at:'squath', series:4, reps:10, pct:70}, {at:'hip', series:4, reps:10, pct:70}]};
-  return {id:'demo0000', v:1, app:'musculation-eleves', classe:'DÉMO', cree:jour(), equipe:'B', listes:{}, motsClasse:['ça tape', 'lourd'], envois:[], e:[e1, e2]};
+  return {id:'demo0000', v:1, app:'musculation-eleves', classe:'DÉMO', cree:jour(), equipe:'B', listes:{}, motsClasse:['intense', 'lourd'], envois:[], e:[e1, e2]};
 }
 
 /* ================== Événements ================== */
