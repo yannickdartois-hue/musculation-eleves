@@ -78,6 +78,7 @@ function rendre(){
   const corps = {seance:vueSeance, charges:vueCharges, projet:vueProjet, carnet:vueCarnet, fiches:vueFiches, envoyer:vueEnvoyer}[ONGLET]();
   main.style.minHeight = main.offsetHeight + 'px';
   main.innerHTML = demo + `<p class="onglet-aide">${AIDE_ONGLET[ONGLET] || ''}</p>` + (ONGLET === 'envoyer' || ONGLET === 'fiches' ? '' : qui) + corps;
+  const bs = $('btnSeance');if(bs)EPSSeances.bouton(bs, {cle:'musculation-eleves:seance', rang:SEANCES_IDS.indexOf(SEANCE), total:SEANCES_IDS.length, texte:'<span aria-hidden="true">▾</span>'});
   window.scrollTo(0, y);
   if(anc){try{const n = main.querySelector(anc.sel);if(n){const d = n.getBoundingClientRect().top - anc.top;if(Math.abs(d) > 1)window.scrollBy(0, d)}}catch(e){}}
   main.style.minHeight = '';
@@ -174,6 +175,17 @@ function arreterScan(){if(FLUX)FLUX.getTracks().forEach(t => t.stop());FLUX = nu
 
 /* ================== Fenêtres ================== */
 function fenetre(html){$('couche').innerHTML = `<div class="fen" data-fond><div role="dialog" aria-modal="true">${html}</div></div>`}
+/* v6.9 : liste des séances : grande piste (repères cliquables) + boutons, pour l'élève qui pratique */
+function ouvrirSeances(){
+  const e = EL(), L = SEANCES_IDS.map(S => ({id:S, n:S, etat:e.seances[S] && Object.keys(e.seances[S]).length ? 'fait' : '', abs:absent(e, S)}));
+  fenetre(`<h3>Changer de séance</h3><p class="small">Touche une séance sur la piste ou dans la liste · ✓ = remplie</p>
+    ${EPSSeances.piste({rang:SEANCES_IDS.indexOf(SEANCE), seances:L, centre:SEANCE + ' / ' + L.length, attr:x => `data-seance="${x.id}"`})}
+    <div class="se-grille">${L.map(x => `<button type="button" data-seance="${x.id}" class="${x.id === SEANCE ? 'ici' : ''} ${x.etat}${x.abs ? ' abs' : ''}"${x.abs ? ' title="absent(e)"' : ''}>${x.id}${x.etat ? ' ✓' : ''}</button>`).join('')}</div>
+    <div class="rangee"><button type="button" class="bt" data-act="fermerFen">Fermer</button></div>`);
+}
+/* les repères de la piste sont dans un dessin (pas des boutons) : leur toucher est traité ici */
+document.addEventListener('click', ev => {const g = ev.target.closest && ev.target.closest('.eps-se-rep[data-seance]');if(!g)return;
+  fermerFen();SEANCE = g.dataset.seance;rendre();window.scrollTo(0, 0)});
 function fermerFen(){arreterScan();$('couche').innerHTML = ''}
 function panneauMobiles(){
   fenetre(`<div class="rangee" style="justify-content:space-between"><h3>Les 3 mobiles</h3><button type="button" class="bt mini" data-act="fermerFen">Fermer</button></div>${MOBILES_ORDRE.map(mobileHTML).join('')}
@@ -267,7 +279,9 @@ function apresRessenti(cle){
    Chaque élève a sa propre progression (seances[S].seq). */
 function vueSeance(){
   const s = seanceById(SEANCE), e = EL(), n = +SEANCE.slice(1);
-  const puces = `<div class="puces">${SEANCES_IDS.map(S => {const f = e.seances[S] && Object.keys(e.seances[S]).length;return `<button type="button" data-seance="${S}" class="${S === SEANCE ? 'ici' : ''}${f ? ' fait' : ''}${absent(e, S) ? ' abs' : ''}"${absent(e, S) ? ' title="absent(e)"' : ''}>${S}</button>`}).join('')}</div>`;
+  /* v6.9 : sélecteur de séance « piste » : séance en cours à gauche, bouton compact à droite (la liste s'ouvre au toucher) */
+  const fS = e.seances[SEANCE] && Object.keys(e.seances[SEANCE]).length;
+  const puces = `<div class="se-bandeau"><b class="se-num">Séance ${n}<small> / ${SEANCES_IDS.length}</small></b>${fS ? '<span class="se-fait">✓ faite</span>' : absent(e, SEANCE) ? '<span class="se-fait abs">absent(e)</span>' : ''}<button type="button" id="btnSeance" class="se-bt" data-act="seancesListe" aria-label="Séance ${n} sur ${SEANCES_IDS.length} : changer de séance"></button></div>`;
   let h = puces + `<div class="rangee" style="justify-content:flex-end"><button type="button" class="bt mini" data-act="scanClasse" data-libre>📷 QR de la classe</button></div><h2>${SEANCE} · ${esc(s.titre)}</h2><p class="muted small">${esc(s.obj)}</p>` + carteAbsence();
   const L = sequences(n), sq = etatSeq(e, SEANCE), ouv = seqOuverte(L, sq);
   const faitesN = L.filter(x => sq.fini[x.k]).length;
@@ -1163,7 +1177,8 @@ document.addEventListener('click', async ev => {
   const d = t.dataset;ANCRE = t;
   if(d.onglet){ONGLET = d.onglet;rendre();window.scrollTo(0, 0);return}
   if(d.qui != null){P = +d.qui;rendre();return}
-  if(d.seance){SEANCE = d.seance;rendre();window.scrollTo(0, 0);return}
+  if(d.seance){if(t.closest('.se-grille'))fermerFen();SEANCE = d.seance;rendre();window.scrollTo(0, 0);return}
+  if(d.act === 'seancesListe'){ouvrirSeances();return}
   if(d.carnet){ouvrir(d.carnet);return}
   if(d.selclasse){SEL = {classe:d.selclasse, noms:[]};rendre();return}
   if(d.selnom){const i = SEL.noms.indexOf(d.selnom);i < 0 ? (SEL.noms.length < 3 ? SEL.noms.push(d.selnom) : toast('3 élèves au maximum.')) : SEL.noms.splice(i, 1);rendre();return}
@@ -1317,7 +1332,7 @@ window.addEventListener('eps-avant-maj', () => sauver());
 /* ---------- Code du cours (eps-code.js) : la saisie d'une séance n'est ouverte qu'en cours ---------- */
 if(window.EPSCode)EPSCode.eleve({app:'mue', classe:() => B && !DEMO ? B.classe || '' : '', seance:() => SEANCE, seances:() => SEANCES_IDS,
   nom:x => x + ' · ' + (seanceById(x) || {titre:''}).titre, ouvrir:x => {SEANCE = x;ONGLET = 'seance';rendre()}, zone:'#main',
-  actif:() => !!B && ONGLET === 'seance', libreSel:'.seq-tete,.titre-fiche,.protocole summary,.puces button,.qui button,[data-fiche],[data-poster],[data-ech],[data-libre],details summary,[data-act="mobiles"]', demo:() => DEMO, bandeau:true});
+  actif:() => !!B && ONGLET === 'seance', libreSel:'.seq-tete,.titre-fiche,.protocole summary,.puces button,.se-bt,.qui button,[data-fiche],[data-poster],[data-ech],[data-libre],details summary,[data-act="mobiles"]', demo:() => DEMO, bandeau:true});
 
 /* ---------- Démarrage ---------- */
 if(/[?&]demo\b/.test(location.search)){DEMO = true;B = binomeDemo();SEANCE = 'S5'}

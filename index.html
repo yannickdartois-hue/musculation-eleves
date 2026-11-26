@@ -66,6 +66,15 @@ input.code{font:800 34px/1 var(--d);letter-spacing:.4em;text-align:center}
 .nav button i{font-style:normal;font-size:22px}
 .nav button.ici{color:var(--act-fonce);box-shadow:inset 0 4px 0 var(--act)}
 /* Séances */
+.se-bandeau{display:flex;align-items:center;gap:8px;padding:4px 0 10px}
+.se-bandeau .se-num{font:800 22px/1 var(--d);white-space:nowrap}.se-bandeau .se-num small{font-size:.7em;opacity:.7}
+.se-bandeau .se-fait{font-weight:700;font-size:15px;color:var(--act);white-space:nowrap}.se-bandeau .se-fait.abs{color:#7f1d1d}
+.se-bandeau .se-bt{margin-left:auto;flex:none;height:48px;min-width:72px;padding:0 12px;border-radius:12px;border:2px solid var(--act);background:var(--craie);color:var(--act);font:800 18px var(--d);cursor:pointer}
+.se-grille{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:8px;margin:6px 0 12px}
+.se-grille button{min-height:48px;border-radius:12px;border:2px solid var(--trait);background:var(--craie);font:800 18px var(--d);cursor:pointer}
+.se-grille button.fait{border-color:#15803d;background:#dcfce7;color:#14532d}.se-grille button.abs{border-style:dashed;color:#7f1d1d}
+.se-grille button.ici{background:var(--act);border-color:var(--act);color:#fff}
+.eps-se-grande{color:var(--act)}
 .puces{display:flex;gap:6px;overflow-x:auto;padding:4px 0 8px;scrollbar-width:none}
 .puces button{flex:none;min-width:52px;min-height:48px;border-radius:12px;border:2px solid var(--trait);background:var(--craie);font:800 18px var(--d)}
 .puces button.ici{background:var(--act);border-color:var(--act);color:#fff}
@@ -351,6 +360,7 @@ h3 .titre-fiche{font-size:inherit;min-height:0}
 <script src="eps-pouls.js"></script>
 <script src="eps-sifflet.js"></script>
 <script src="minuteur.js"></script>
+<script src="eps-seances.js"></script>
 <script src="app.js"></script>
 <script src="aide.js"></script>
 <script src="eps-aide.js"></script>
