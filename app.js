@@ -107,7 +107,7 @@ function blocNouveau(){
    ${cl.length ? '' : `<label class="ch" for="nClasse">Classe</label><input type="text" id="nClasse" placeholder="ex. TG3" maxlength="20" autocomplete="off">`}
    <label class="ch" for="nE1">Élève (prénom et nom)</label><input type="text" id="nE1" autocomplete="off" maxlength="60"><label class="ch" for="nE2">Élève (prénom et nom)</label><input type="text" id="nE2" autocomplete="off" maxlength="60"></details>
    <p class="small">${cl.length ? '3' : '2'}. Code secret du binôme (4 chiffres) :</p><input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" id="nCode" class="code" autocomplete="off">
-   <p class="small muted">Il protège votre carnet si le téléphone est prêté. Ne l'oubliez pas : le professeur ne peut pas le retrouver.</p>
+   <p class="small muted">Il protège votre carnet si le téléphone est prêté. En cas d'oubli : « Code oublié ? », puis montrez le QR au professeur.</p>
    <button type="button" class="bt act pleine" data-act="creer">Créer le carnet</button>`;
 }
 async function creer(){
@@ -123,8 +123,15 @@ async function creer(){
 }
 function ouvrir(id){
   const c = CARNETS[id];if(!c)return;
-  fenetre(`<h3>🔒 ${esc(c.e.map(x => prenom(x.nom)).join(' & '))}</h3><p>Code secret du binôme :</p><input type="password" inputmode="numeric" maxlength="4" id="oCode" class="code" autocomplete="off"><p class="small" id="oErr" style="color:var(--alerte);font-weight:700;min-height:1.4em"></p><div class="rangee"><button type="button" class="bt act" data-act="valCode" data-id="${id}">Ouvrir</button><button type="button" class="bt" data-act="fermerFen">Annuler</button></div>`);
+  fenetre(`<h3>🔒 ${esc(c.e.map(x => prenom(x.nom)).join(' & '))}</h3><p>Code secret du binôme :</p><input type="password" inputmode="numeric" maxlength="4" id="oCode" class="code" autocomplete="off"><p class="small" id="oErr" style="color:var(--alerte);font-weight:700;min-height:1.4em"></p><div class="rangee"><button type="button" class="bt act" data-act="valCode" data-id="${id}">Ouvrir</button><button type="button" class="bt" data-act="fermerFen">Annuler</button></div><p class="center" style="margin-top:10px"><button type="button" class="bt" data-act="codeOubli" data-id="${id}">🔑 Code oublié ?</button></p>`);
   setTimeout(() => {const i = $('oCode');if(i)i.focus()}, 50);
+}
+/* Code oublié (même principe que l'appli gym) : un QR à montrer au professeur, qui le scanne et lit le code.
+   Le QR porte l'empreinte du code (jamais le code) : l'outil prof retrouve le code à partir de l'empreinte. */
+async function codeOubli(id){
+  const c = CARNETS[id];if(!c)return;
+  let svg;try{svg = svgQR(await chaineQR({a:'MUS', v:1, t:'O', c:c.classe || '', n:c.e.map(x => x.nom), i:id, h:c.code}))}catch(e){return toast('QR impossible : ' + e.message)}
+  fenetre(`<h3>🔑 Code oublié</h3><p><b>Montrez ce QR au professeur</b> : il le scanne et vous dit votre code.</p><div class="qr" style="max-width:300px;margin:10px auto">${svg}</div><p class="small muted">Rien à rescanner ensuite : tapez simplement le code donné par le professeur.</p><div class="rangee"><button type="button" class="bt act" data-act="carnetCode" data-id="${id}">J'ai mon code</button><button type="button" class="bt" data-act="fermerFen">Annuler</button></div>`);
 }
 async function validerCode(id){
   const c = CARNETS[id];if(!c)return;
@@ -1274,6 +1281,8 @@ document.addEventListener('click', async ev => {
     case 'calcLibre': calcLibre();break;
     case 'fermerFen': fermerFen();break;
     case 'valCode': validerCode(d.id);break;
+    case 'codeOubli': codeOubli(d.id);break;
+    case 'carnetCode': ouvrir(d.id);break;
     case 'pouls': if(window.EPSPouls)EPSPouls.ouvrir({titre:'Pouls en fin d\'échauffement', onFC:v => {const s = sea(EL(), SEANCE);s.ech = s.ech || {};s.ech.pouls = v;sauver();rendre()}});else{const v = parseInt(prompt('Pulsations par minute :'), 10);if(v){const s = sea(EL(), SEANCE);s.ech = s.ech || {};s.ech.pouls = v;sauver();rendre()}}break;
     case 'qrMots': afficherQRMots();break;
     case 'changerListe': changerListe();break;
