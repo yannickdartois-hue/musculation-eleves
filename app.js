@@ -88,10 +88,10 @@ function rendre(){
 function accueil(){
   const l = Object.values(CARNETS).sort((a, b) => (b.maj || 0) - (a.maj || 0));
   return `<h2>Mon carnet de musculation</h2>
-  ${l.length ? `<section class="carte"><h3>Carnets sur ce téléphone</h3>${l.map(c => `<button type="button" class="bt pleine" style="margin:6px 0;justify-content:flex-start" data-carnet="${c.id}">🔒 ${esc(c.e.map(x => x.nom).join(' & '))}${c.classe ? ` <span class="muted small">· ${esc(c.classe)}</span>` : ''}</button>`).join('')}</section>` : ''}
-  <section class="carte"><h3>📖 Fiches d'exercice</h3><p class="small muted">Les fiches des ateliers et le répertoire de l'échauffement, en libre consultation.</p><button type="button" class="bt pleine" data-act="fichesLibres">Voir les fiches</button></section>
+  ${l.length ? `<section class="carte"><h3>Ouvre ton carnet</h3><p class="small muted">Touche ton binôme, puis tape votre code secret.</p>${l.map(c => `<button type="button" class="bt pleine" style="margin:6px 0;display:flex;justify-content:flex-start;text-align:left;gap:8px;min-height:54px" data-carnet="${c.id}"><span>🔒</span><span style="flex:1">${esc(c.e.map(x => x.nom).join(' & '))}</span>${c.classe ? `<span class="muted small">${esc(c.classe)}</span>` : ''}</button>`).join('')}</section>` : ''}
   <section class="carte"><h3>📷 QR de la classe</h3><p class="small muted">Scanne le QR affiché par le professeur : il donne la liste de la classe${Object.keys(CLASSES).length ? ' (classe' + (Object.keys(CLASSES).length > 1 ? 's' : '') + ' reçue' + (Object.keys(CLASSES).length > 1 ? 's' : '') + ' : ' + esc(Object.keys(CLASSES).join(', ')) + ')' : ''} et ouvre la séance du jour.</p><button type="button" class="bt act" data-act="scanClasse">📷 Scanner le QR de la classe</button></section>
   <section class="carte act"><h3>＋ Nouveau binôme</h3>${blocNouveau()}</section>
+  <section class="carte"><h3>📖 Fiches d'exercice</h3><p class="small muted">Les fiches des ateliers et le répertoire de l'échauffement, en libre consultation.</p><button type="button" class="bt pleine" data-act="fichesLibres">Voir les fiches</button></section>
   <section class="carte"><h3>📥 Récupérer un carnet</h3><p class="small muted">Changement de téléphone : choisis le fichier .json téléchargé depuis l'onglet « Au prof ». Rien n'est écrasé sans ton accord.</p><button type="button" class="bt" data-act="importer">📥 Choisir le fichier du carnet</button></section>
   <section class="carte"><h3>👀 Découvrir l'appli</h3><p class="small muted">Un binôme fictif déjà rempli, pour voir tous les écrans. Rien n'est enregistré.</p><button type="button" class="bt" data-act="demo">Essayer l'appli (démo)</button></section>
   <section class="carte info"><h3>Sans carnet</h3><div class="rangee"><button type="button" class="bt mini" data-act="mobiles">📋 Les 3 mobiles</button><button type="button" class="bt mini" data-act="calcLibre">🧮 Calculette</button></div></section>`;
@@ -102,10 +102,14 @@ function blocNouveau(){
   const pris = new Set(Object.values(CARNETS).filter(c => c.classe === SEL.classe).flatMap(c => c.e.map(x => x.nom)));
   const choix = cl.length ? `<p class="small">1. Ta classe :</p><div class="chips">${cl.map(c => `<button type="button" class="${c === SEL.classe ? 'ici' : ''}" data-selclasse="${esc(c)}">${esc(c)}</button>`).join('')}</div>
    ${SEL.classe ? `<p class="small">2. Touchez vos noms (2, ou 3 pour un trinôme) :</p><div class="chips">${CLASSES[SEL.classe].l.map(n => `<button type="button" class="${SEL.noms.includes(n) ? 'ici' : ''}" data-selnom="${esc(n)}"${pris.has(n) ? ' title="déjà dans un carnet sur ce téléphone"' : ''}>${pris.has(n) ? '✓ ' : ''}${esc(n)}</button>`).join('')}</div>
-   ${SEL.noms.length ? `<p><b>${esc(SEL.noms.join(' & '))}</b></p>` : ''}` : ''}` : `<p class="retour non">Scannez d'abord le <b>QR de la classe</b> (ci-dessous) : la liste des élèves s'affichera ici.</p>`;
-  return `${choix}<details${cl.length ? '' : ' open'}><summary>${cl.length ? 'Un nom manque dans la liste ?' : 'Pas de QR ? Écrire les noms'}</summary><p class="small muted">Prénom ET nom, comme sur Pronote.</p>
+   ${SEL.noms.length ? `<p><b>${esc(SEL.noms.join(' & '))}</b></p>` : ''}` : ''}` : `<p class="retour non">Scannez d'abord le <b>QR de la classe</b> (ci-dessus) : la liste des élèves s'affichera ici.</p>`;
+  if(!cl.length)return `${choix}<details><summary>Pas de QR ? Écrire les noms</summary>${formNoms(cl)}</details>`;
+  return `${choix}${formNoms(cl)}`;
+}
+function formNoms(cl){
+  return `${cl.length ? '<details><summary>Un nom manque dans la liste ?</summary>' : ''}<p class="small muted">Prénom ET nom, comme sur Pronote.</p>
    ${cl.length ? '' : `<label class="ch" for="nClasse">Classe</label><input type="text" id="nClasse" placeholder="ex. TG3" maxlength="20" autocomplete="off">`}
-   <label class="ch" for="nE1">Élève (prénom et nom)</label><input type="text" id="nE1" autocomplete="off" maxlength="60"><label class="ch" for="nE2">Élève (prénom et nom)</label><input type="text" id="nE2" autocomplete="off" maxlength="60"></details>
+   <label class="ch" for="nE1">Élève (prénom et nom)</label><input type="text" id="nE1" autocomplete="off" maxlength="60"><label class="ch" for="nE2">Élève (prénom et nom)</label><input type="text" id="nE2" autocomplete="off" maxlength="60">${cl.length ? '</details>' : ''}
    <p class="small">${cl.length ? '3' : '2'}. Code secret du binôme (4 chiffres) :</p><input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" id="nCode" class="code" autocomplete="off">
    <p class="small muted">Il protège votre carnet si le téléphone est prêté. En cas d'oubli : « Code oublié ? », puis montrez le QR au professeur.</p>
    <button type="button" class="bt act pleine" data-act="creer">Créer le carnet</button>`;
