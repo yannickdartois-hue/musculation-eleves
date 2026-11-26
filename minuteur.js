@@ -39,21 +39,34 @@ function ouvrir(o){
   document.body.appendChild(div);document.documentElement.classList.add('chrono-ouvert');eveil(true);
   const ecoule = () => (Date.now() - t0) / 1000;
   let miFait = false;
-  function changer(p){phase = p;t0 = Date.now();dernier = -1;miFait = false;rendu()}
-  function boucle(){
-    const e = ecoule(), s = Math.ceil(e);
-    if(phase === 'prep'){const r = PREP - e;if(r <= 0){if(!SIF('depart'))go();return changer('serie')}if(Math.ceil(r) !== dernier){dernier = Math.ceil(r);bip()}}
-    else if(phase === 'serie' && o.temps){const r = nb(o.reps) - e;if(nb(o.reps) >= 60 && !miFait && r <= nb(o.reps) / 2){miFait = true;SIF('mi')}if(r <= 0){const s = SIF('fin');if(!s)go();return finSerie(s)}if(r <= 3 && Math.ceil(r) !== dernier){dernier = Math.ceil(r);bip()}}
-    else if(phase === 'repos'){const r = recup - e;if(r <= 0){if(!SIF('reprise'))go();serie++;return changer('serie')}if(r <= 3 && Math.ceil(r) !== dernier){dernier = Math.ceil(r);bip()}else if(Math.round(r) === 10 && dernier !== 10){dernier = 10;son(660, .15)}}
+  /* v6.5 : une phase qui s'enchaîne toute seule démarre à la fin PRÉVUE de la précédente (debut), pas « maintenant » :
+     plus de retard qui s'ajoute à chaque transition. Après une mise en veille, toutes les phases dépassées
+     sont rattrapées d'un coup et EN SILENCE (plus de rafale de bips au réveil). Un appui de l'élève part de maintenant. */
+  const TARD = 1.5;   // secondes : au-delà, le signal est passé pendant la veille, on ne le joue plus
+  function changer(p, debut){phase = p;t0 = debut || Date.now();dernier = -1;miFait = false;rendu()}
+  function etape(){   // true si une phase s'est terminée (il faut regarder la suivante)
+    const e = ecoule();
+    if(phase === 'prep'){const r = PREP - e;if(r <= 0){if(-r <= TARD && !SIF('depart'))go();changer('serie', t0 + PREP * 1000);return true}
+      if(Math.ceil(r) !== dernier){dernier = Math.ceil(r);bip()}}
+    else if(phase === 'serie' && o.temps){const D = nb(o.reps), r = D - e;
+      if(D >= 60 && !miFait && r <= D / 2){miFait = true;if(r > 0 && D / 2 - r <= TARD)SIF('mi')}
+      if(r <= 0){const tard = -r > TARD, sf = tard || SIF('fin');if(!sf)go();finSerie(sf, t0 + D * 1000);return true}
+      if(r <= 3 && Math.ceil(r) !== dernier){dernier = Math.ceil(r);bip()}}
+    else if(phase === 'repos'){const r = recup - e;if(r <= 0){if(-r <= TARD && !SIF('reprise'))go();serie++;changer('serie', t0 + recup * 1000);return true}
+      if(r <= 3 && Math.ceil(r) !== dernier){dernier = Math.ceil(r);bip()}else if(Math.round(r) === 10 && dernier !== 10){dernier = 10;son(660, .15)}}
+    return false;
+  }
+  function maj(){
     const el = div.querySelector('.chm-temps');if(el)el.textContent = affTemps();
     const ba = div.querySelector('.chm-barre i');if(ba)ba.style.width = progr() + '%';
   }
+  function boucle(){for(let g = 0; g < 50 && etape(); g++);maj()}
   function affTemps(){const e = ecoule();
     if(phase === 'prep')return String(Math.max(1, Math.ceil(PREP - e)));
     if(phase === 'serie')return o.temps ? mmss(nb(o.reps) - e) : mmss(e);
     if(phase === 'repos')return mmss(recup - e);return ''}
   function progr(){const e = ecoule();return phase === 'repos' ? Math.min(100, e / recup * 100) : phase === 'serie' && o.temps ? Math.min(100, e / nb(o.reps) * 100) : 0}
-  function finSerie(dejaSiffle){if(serie >= N){if(!dejaSiffle && !SIF('fin'))fin();changer('fini')}else changer('repos')}
+  function finSerie(dejaSiffle, debut){if(serie >= N){if(!dejaSiffle && !SIF('fin'))fin();changer('fini', debut)}else changer('repos', debut)}
   function fermer(){clearInterval(tick);eveil(false);document.removeEventListener('visibilitychange', vis);div.remove();document.documentElement.classList.remove('chrono-ouvert')}
   function vis(){if(document.visibilityState === 'visible'){eveil(true);boucle()}}
   function coach(){return `<details class="chm-coach"${voirCoach ? ' open' : ''}><summary>👀 Coach${o.partenaire ? ' (' + esc(o.partenaire) + ')' : ''} : ce que tu vérifies</summary>
@@ -83,7 +96,7 @@ function ouvrir(o){
     div.className = 'chm ph-' + phase;
     const ruban = {prep:'⏳ PRÊT ?', serie:'💪 TRAVAIL', repos:'⏸ REPOS', fini:'✓ TERMINÉ'}[phase];
     div.innerHTML = `<div class="chm-ruban">${ruban}${phase === 'serie' ? `<small>série ${serie} / ${N}</small>` : phase === 'repos' ? `<small>prochaine série : ${serie + 1} / ${N}</small>` : ''}</div><div class="chm-in">${tete}${pastilles}${corps}</div>`;
-    boucle();
+    maj();
   }
   div.addEventListener('toggle', ev => {if(ev.target.matches && ev.target.matches('.chm-coach'))voirCoach = ev.target.open}, true);
   div.addEventListener('click', ev => {const b = ev.target.closest('[data-c]');if(!b)return;const c = b.dataset.c;
