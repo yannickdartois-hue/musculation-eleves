@@ -60,6 +60,12 @@ input.code{font:800 34px/1 var(--d);letter-spacing:.4em;text-align:center}
 .qui span{font-weight:700;color:var(--repere);font-size:15px}
 .qui button{min-height:48px;padding:0 16px;border-radius:24px;border:2px solid var(--encre);background:var(--craie);font-weight:700}
 .qui button.ici{background:var(--encre);color:var(--sur-encre)}
+/* v6.15 : « Passer aux saisies de … » (modèle de l'appli demi-fond élève) : une couleur par élève */
+.tour{border-radius:14px;padding:8px 10px;color:#fff;margin:6px 0 12px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.tour.bas{margin:14px 0 0}.tour.ta{background:#1d4ed8}.tour.tb{background:#c2410c}.tour.tc{background:#15803d}
+.tour>span{font-size:16px}.tour b{font-size:17px}
+.tour-sw{background:#fff;color:#14181f;border:0;border-radius:12px;min-height:48px;padding:0 14px;font:inherit;font-weight:800;font-size:16px;cursor:pointer;flex:1 1 auto;max-width:100%}
+.rep-bt{min-height:56px;font-size:17px;font-weight:800;margin-top:10px}.rep-aide{margin:6px 0 0}.rep-ok{margin-top:10px}
 /* Onglets du bas + bouton Mobiles */
 .nav{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;background:var(--craie);border-top:1px solid var(--trait);padding-bottom:env(safe-area-inset-bottom)}
 .nav button{flex:1;min-height:64px;border:0;background:none;font:700 14px/1.1 var(--t);color:var(--repere);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}

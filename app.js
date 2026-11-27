@@ -48,6 +48,16 @@ const FORME = [[1,'😫','Très fatigué'],[2,'😕','Fatigué'],[3,'😐','Norm
 const nouvelEleve = nom => ({nom, situe:null, rm:{}, tests:{}, seances:{}, niv:{}, choix:null, echelle:{}, projet:null, afl:{rep:'', role:''}, ajust:[]});
 const EL = () => B.e[P];
 const autre = () => B.e.length > 1 ? B.e[(P + 1) % B.e.length] : null;
+/* v6.15 : élève suivant pour les saisies (« Passer aux saisies de … ») : le prochain du binôme / trinôme qui n'est pas absent */
+function iSuivant(){if(!B || B.e.length < 2)return -1;for(let k = 1;k < B.e.length;k++){const i = (P + k) % B.e.length;if(!absent(B.e[i]))return i}return -1}
+function barreTour(k, bas){const i = iSuivant();if(i < 0)return '';const ot = B.e[i];
+  return `<div class="tour t${'abc'[P] || 'a'}${bas ? ' bas' : ''}"><span>✏️ Saisies de <b>${esc(prenom(EL().nom))}</b></span><button type="button" class="tour-sw" data-tour="${i}" data-tseq="${k}">Passer aux saisies de ${esc(prenom(ot.nom))} ▶</button></div>`}
+/* v6.15 : reporter les coches d'échauffement sur le partenaire en une touche (sauf la série d'approche d'un exercice qu'il ne fait pas) */
+function cochesPour(i){const src = (sea(EL(), SEANCE).ech || {}).wc || [], ot = B.e[i], P0 = P, n = +SEANCE.slice(1);
+  let jourA = [], jourB = [];try{jourA = exosDuJour(n);P = i;jourB = exosDuJour(n)}finally{P = P0}
+  const memes = jourA.length === jourB.length && jourA.every(x => jourB.includes(x));
+  return src.filter(k => k.startsWith('sp:') ? jourB.includes(k.slice(3)) : k === 'P5' ? memes : true)}
+function cochesAJour(i){const dst = (sea(B.e[i], SEANCE).ech || {}).wc || [];return cochesPour(i).every(k => dst.includes(k))}
 function sea(e, S){e.seances[S] = e.seances[S] || {};return e.seances[S]}
 function sauver(){if(!B || DEMO)return;B.maj = Date.now();CARNETS[B.id] = B;ecrire(CLE, CARNETS)}
 const initiales = nom => String(nom).split(/\s+/).filter(Boolean).map(m => m[0].toUpperCase()).join('');
@@ -303,8 +313,8 @@ function vueSeance(){
     h += `<section class="seq st-${st[0]}${ouvert ? ' ouv' : ''}" id="seq-${x.k}"><button type="button" class="seq-tete" data-seq="${x.k}" aria-expanded="${ouvert}"><span class="seq-n">${fini ? '✓' : i + 1}</span><span class="seq-t"><b>Séquence ${i + 1} · ${esc(x.t)}</b><small>${st[1]}</small></span><span class="seq-ch" aria-hidden="true">${ouvert ? '▴' : '▾'}</span></button>`;
     if(ouvert){
       const b = x.bouton ? x.bouton() : {txt:'Séquence terminée', ok:true};
-      h += `<div class="seq-corps"><p class="seq-obj">🎯 <b>Objectif :</b> ${esc(x.obj)}</p><p class="seq-faire">👉 ${x.faire}</p>${x.corps()}
-       <div class="seq-fin"><p class="small"><b>Pour valider :</b> ${esc(x.valid)}</p>${fini ? `<p class="retour ok">✓ Séquence terminée. Tu peux encore corriger ce qu'elle contient.</p>` : `<button type="button" class="bt ${b.ok ? 'ok' : ''} pleine seq-bt" data-seqfin="${x.k}"${b.bloque ? ' disabled' : ''}${b.conf ? ` data-conf="${esc(b.conf)}"` : ''}>${b.txt}</button>${b.aide ? `<p class="small muted">${b.aide}</p>` : ''}`}</div></div>`;
+      h += `<div class="seq-corps">${barreTour(x.k)}<p class="seq-obj">🎯 <b>Objectif :</b> ${esc(x.obj)}</p><p class="seq-faire">👉 ${x.faire}</p>${x.corps()}
+       <div class="seq-fin"><p class="small"><b>Pour valider :</b> ${esc(x.valid)}</p>${fini ? `<p class="retour ok">✓ Séquence terminée. Tu peux encore corriger ce qu'elle contient.</p>` : `<button type="button" class="bt ${b.ok ? 'ok' : ''} pleine seq-bt" data-seqfin="${x.k}"${b.bloque ? ' disabled' : ''}${b.conf ? ` data-conf="${esc(b.conf)}"` : ''}>${b.txt}</button>${b.aide ? `<p class="small muted">${b.aide}</p>` : ''}`}${barreTour(x.k, true)}</div></div>`;
     }
     h += '</section>';
   });
@@ -321,7 +331,7 @@ function sequences(n){
   const e = EL(), S = SEANCE, L = [];
   /* Séquence 1 : échauffement (toutes les séances) */
   L.push({k:'ech', t:'Je prépare mon corps à l\'effort', obj:'Élever la température du corps, mobiliser les articulations et activer les muscles du jour pour travailler en sécurité.',
-    faire:'Fais les 4 étapes dans l\'ordre et coche chacune quand elle est faite. Chacun coche sur son profil (« Qui pratique ? »).',
+    faire:'Fais les 4 étapes dans l\'ordre et coche chacune quand elle est faite. Chacun coche sur son profil ; si vous avez fait le même échauffement, une touche reporte tes coches à ton partenaire.',
     valid:'les 4 étapes cochées, dont le gainage obligatoire. Le bouton s\'active alors.', commence:() => ((sea(e, S).ech || {}).wc || []).length > 0,
     corps:() => (n >= 4 ? carteForme() : '') + carteEchauffement(n === 1),
     bouton:() => {const P_ = partiesEch(n), wc = (sea(e, S).ech || {}).wc || [], has = k => wc.includes(k), f = P_.filter(x => x.ok(has)).length;
@@ -414,10 +424,12 @@ function carteEchauffement(s1){   // v3.0 : échauffement guidé en 5 parties, c
      <details class="wdet"${OUV_ECH.has(x.k) ? ' open' : ''} data-wdet="${x.k}"><summary>Voir le détail${x.compte ? ' · ' + x.compte(has) : ''}</summary>${x.intro ? `<p class="small muted">${esc(x.intro)}</p>` : ''}<div class="wgrid">${x.l.map(id => typeof id === 'string' ? carte(id, (x.star || []).includes(id)) : id.html).join('')}</div></details></div>`}).join('');
   const aut = autre(), renf = renfEch();
   return `<section class="carte"><h3>🔥 Mon échauffement · ${esc(prenom(EL().nom))} · ${faites}/${P.length}</h3>
-   <p class="small muted">Environ 15 min. Touche une étape quand elle est faite, ou coche les exercices dans « Voir le détail ». Les coches sont à toi : ton partenaire coche sur son profil${aut ? `, ou touche « Copier pour ${esc(prenom(aut.nom))} » s'il a fait la même chose` : ''}.</p>
+   <p class="small muted">Environ 15 min. Touche une étape quand elle est faite, ou coche les exercices dans « Voir le détail ». Les coches sont à toi${aut ? ` : si ${esc(prenom(aut.nom))} a fait la même chose, reporte-les-lui en une touche (bouton sous les étapes)` : ''}.</p>
    <div class="wtimer" id="wtimer"${WT ? '' : ' hidden'}><span id="wtt">0:00</span><button type="button" class="bt mini" data-wta="stop">Arrêter</button></div>
    ${parts}
-   ${aut && wc.length ? `<button type="button" class="bt mini" data-act="copierEch">📋 Copier mes coches pour ${esc(prenom(aut.nom))}</button>` : ''}
+   ${(() => {const i = iSuivant();if(i < 0 || !wc.length)return '';const pn = esc(prenom(B.e[i].nom));
+     return cochesAJour(i) ? `<p class="retour ok rep-ok">✓ ${pn} a les mêmes coches que toi.</p>`
+       : `<button type="button" class="bt act pleine rep-bt" data-act="copierEch" data-v="${i}">📋 Reporter mes ${wc.length} coche${wc.length > 1 ? 's' : ''} à ${pn}</button><p class="small muted rep-aide">Une seule touche si ${pn} a fait le même échauffement. ${pn} pourra encore décocher ce qu'il n'a pas fait.</p>`})()}
    <details class="wdet renf"${OUV_ECH.has('renf') ? ' open' : ''} data-wdet="renf"><summary>💪 Exercices au poids du corps (facultatifs)</summary><p class="small muted">Pompes, gainage, abdominaux : en complément, si tu as le temps. Ils ne comptent pas dans les 4 étapes.</p><div class="wgrid">${renf.map(id => carte(id)).join('')}</div></details>
    <div class="rangee" style="margin-top:8px"><button type="button" class="bt mini" data-act="pouls">❤️ Prendre mon pouls</button>${ech.pouls ? `<b>${ech.pouls} puls/min</b>` : ''}</div>
    ${n <= 3 ? `<h4>${s1 ? 'Après 2-3 min de course' : 'Début d\'échauffement'} : note et mot</h4>${ressentiHTML('ech.debut', ech.debut)}<h4>Fin d'échauffement : note et mot</h4>${ressentiHTML('ech.fin', ech.fin)}` : ''}</section>`;
@@ -1197,6 +1209,11 @@ document.addEventListener('click', async ev => {
   const d = t.dataset;ANCRE = t;
   if(d.onglet){ONGLET = d.onglet;rendre();window.scrollTo(0, 0);return}
   if(d.qui != null){P = +d.qui;rendre();return}
+  /* v6.15 : « Passer aux saisies de … » : même séquence ouverte chez le partenaire, l'écran se place dessus */
+  if(d.tour != null){P = +d.tour;const k = d.tseq;if(k){const sq = etatSeq(EL(), SEANCE);sq.ouv = k;sauver()}ANCRE = null;rendre();
+    const el = k && document.getElementById('seq-' + k), q = document.querySelector('.qui');
+    if(el)window.scrollTo(0, Math.max(0, el.getBoundingClientRect().top + window.scrollY - (q ? q.offsetHeight : 0) - 8));
+    toast('✏️ Saisies de ' + prenom(EL().nom));return}
   if(d.seance){if(t.closest('.se-grille'))fermerFen();SEANCE = d.seance;rendre();window.scrollTo(0, 0);return}
   if(d.act === 'seancesListe'){ouvrirSeances();return}
   if(d.carnet){ouvrir(d.carnet);return}
@@ -1287,7 +1304,9 @@ document.addEventListener('click', async ev => {
     case 'valTirage': {const e = EL(), l = e.tirageMan || [];if(l.length !== 3)return toast('Choisis exactement 3 exercices.');e.tirage = {l:l.slice(), src:'manuel', date:jour()};sauver();rendre();break}
     case 'refaireTirage': if(confirm('Effacer le tirage enregistré ?')){delete EL().tirage;EL().tirageMan = [];sauver();rendre()}break;
     case 'chronoBinome': choixBinome();break;
-    case 'copierEch': {const src = (sea(EL(), SEANCE).ech || {}).wc || [], aut = autre();if(!aut)break;const x = sea(aut, SEANCE);x.ech = x.ech || {};x.ech.wc = [...new Set((x.ech.wc || []).concat(src))];sauver();toast('Coches copiées pour ' + prenom(aut.nom));rendre();break}
+    case 'copierEch': {const i = d.v != null && d.v !== '' ? +d.v : iSuivant();if(i < 0 || !B.e[i] || i === P)break;const ot = B.e[i], src = cochesPour(i), x = sea(ot, SEANCE);
+      x.ech = x.ech || {};const av = (x.ech.wc || []).length;x.ech.wc = [...new Set((x.ech.wc || []).concat(src))];sauver();
+      toast(`✓ ${x.ech.wc.length - av} coche${x.ech.wc.length - av > 1 ? 's' : ''} reportée${x.ech.wc.length - av > 1 ? 's' : ''} à ${prenom(ot.nom)}`);rendre();break}
     case 'goBinome': lancerBinome();break;
     case 'calcUtiliser': CALC.cm = +d.cm;CALC.mode = 'pct';rendreCalc();break;
     case 'fichesLibres': FICHES_LIBRES = true;rendre();window.scrollTo(0, 0);break;
